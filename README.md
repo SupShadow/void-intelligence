@@ -17,89 +17,97 @@ void breathe --demo
 
 ## The Problem
 
-Every LLM call starts from zero. No memory of what worked. No scars from what failed. No awareness of what it *can't* see. You build context into prompts manually, repeatedly, expensively.
+Every LLM call starts from zero. No memory of what worked. No awareness of what it *can't* do. You build context into prompts manually, repeatedly, expensively.
 
-This is not intelligence. This is amnesia with good vocabulary.
+**VOID adds three things your LLM stack is missing:** self-awareness, failure memory, and input classification. Zero dependencies. Drop-in decorators.
 
 ## What VOID Does
 
-VOID is an organism layer that wraps your existing LLM calls. Three things change:
-
-**1. Your functions know what they lose.**
+**1. Declare what your functions can't see.**
 
 ```python
+import openai
 from void_intelligence import lost_dimensions
 
-@lost_dimensions("emotional_nuance", "body_language", "subtext")
+@lost_dimensions("emotional_nuance", "body_language", "sarcasm")
 def summarize_meeting(transcript: str) -> str:
-    result = your_llm.summarize(transcript)
-    return result
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": f"Summarize:\n{transcript}"}],
+    )
+    return response.choices[0].message.content
 
-# Later, you can check what was lost:
-# result._lost_dimensions → ["emotional_nuance", "body_language", "subtext"]
-#
-# Why this matters: when the summary misses sarcasm, you know WHY.
-# The function declared its blind spots upfront.
+result = summarize_meeting(transcript)
+
+# The decorator attaches metadata to the function:
+summarize_meeting._lost_dimensions  # → ["emotional_nuance", "body_language", "sarcasm"]
+
+# When the summary misses sarcasm, you know WHY — the function
+# declared its blind spots upfront. Queryable at runtime.
 ```
 
-**2. Your functions remember pain.**
+**2. Stop calling broken endpoints.**
 
 ```python
-from void_intelligence import circuit_breaker
+import openai
+from void_intelligence import circuit_breaker, CircuitBreakerOpen
 
 @circuit_breaker("openai_api", threshold=3, timeout=30.0)
 def call_openai(prompt: str) -> str:
-    return openai.chat.completions.create(messages=[{"role": "user", "content": prompt}])
+    response = openai.chat.completions.create(
+        model="gpt-4",
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return response.choices[0].message.content
 
-# Fails 3 times → stops calling for 30 seconds → tries once → heals or stays down.
-# Not a retry wrapper. Scar tissue. The system adapts.
+# 3 failures → circuit opens → raises CircuitBreakerOpen for 30s → tries once → heals or stays open.
+# Like tenacity/pybreaker, but with one difference: it's part of an organism (see below).
 ```
 
-**3. Your LLM calls get a heartbeat.**
+**3. Classify prompts before your LLM sees them.**
 
 ```python
 from void_intelligence import OrganismBreather
 
 organism = OrganismBreather()
 
-# Before your LLM call: classify the prompt
+# Before your LLM call: classify the prompt on 6 axes
 breath = organism.inhale("Help me write an urgent email to my team")
-# breath["hex"] → {"ruhe_druck": 0.8, "allein_zusammen": 0.6, ...}
-# Now you KNOW this is a high-pressure, collaborative request.
-# You can adjust temperature, system prompt, or model choice accordingly.
+# breath["hex"] → {"ruhe_druck": 1.0, "allein_zusammen": 1.0, "empfangen_schaffen": 1.0, ...}
+# High pressure, collaborative, creative. Route to a direct-tone system prompt.
 
-response = your_llm.generate(prompt)  # your existing code
+response = call_openai("Help me write an urgent email to my team")
 
-# After: record what the organism learned
+# After: record what worked
 organism.exhale(response, learnings=["urgency shifts tone toward direct language"])
 
-# Check vitals
+# Check state
 organism.vitals()
-# → {"alive": True, "breaths": 1, "rings": {"total": 1}, "bpm": 60.0}
+# → {"alive": True, "breaths": 1, "rings": {"total": 1, "by_type": {"learning": 1}}, ...}
 ```
 
 ## The Metric: V-Score
 
-How do you measure if an LLM system is *alive* vs just generating text?
+We propose a multiplicative metric for LLM system adaptiveness:
 
 ```
 V = E × W × S × B × H × R
 
-E  Emergence      Does it create what wasn't in the prompt?
-W  Warmth         Does it respond differently to "I'm stressed" vs "optimize this"?
-S  Soul Fidelity  Does it maintain consistent identity across calls?
-B  Breath         Does it adapt to the emotional register of the input?
-H  Hex Balance    Does it handle all 6 communication axes (see below)?
-R  Ring Yield     Does it improve from each interaction?
+E  Emergence      Does the system create what wasn't in the prompt?
+W  Warmth         Does it differentiate "I'm stressed" from "optimize this"?
+S  Soul Fidelity  Does it maintain consistent behavior across calls?
+B  Breath         Does it classify the emotional register of input?
+H  Hex Balance    Does it handle all 6 communication axes?
+R  Ring Yield     Does it accumulate learnings from interactions?
 ```
 
-**Multiplicative.** One zero kills everything. Standard LLMs have W=0 (no warmth detection), B=0 (no breath), R=0 (no learning). Therefore V=0.000 — no matter how smart they are.
+**Multiplicative.** One zero kills everything. A vanilla LLM has W=0 (no input classification), B=0 (no breath cycle), R=0 (no learning loop). Therefore V=0.000.
 
-With VOID's organism layer: V=0.047. Small number, infinite improvement over zero.
+With VOID wrapping the same LLM: V=0.047. The number is small because the formula is strict — but it's measurably nonzero.
 
-## HexBreath: Reading the Room
+## HexBreath: 6-Axis Prompt Classification
 
-Every message has an emotional shape. VOID classifies it on 6 axes:
+Keyword-based, deterministic, no LLM needed. Classifies any text on 6 axes:
 
 ```
 Calm     ◂━━━━━━━━━━━▸ Pressure
@@ -115,16 +123,18 @@ from void_intelligence import HexBreath
 
 hex_breath = HexBreath()
 
-# High-pressure collaborative request
+# Action-oriented request
 coord = hex_breath.classify("Build something fast with the team")
-print(coord.balance)  # 0.18 — pulled hard toward action
+print(coord.allein_zusammen)  # +1.0 (together)
+print(coord.langsam_schnell)  # +1.0 (fast)
+print(coord.balance)          # 0.29 — pulled hard toward action
 
-# Reflective solo request
+# Reflective request
 coord = hex_breath.classify("I need to think about what happened today")
-print(coord.balance)  # 0.59 — calm, introspective
+print(coord.sein_tun)         # -1.0 (being, not doing)
+print(coord.balance)          # 0.59 — calm, introspective
 
-# Use this to route to different prompts, models, or temperatures.
-# A standard LLM treats both the same. An organism doesn't.
+# Use this to route to different system prompts, models, or temperatures.
 ```
 
 ## CLI
@@ -136,15 +146,15 @@ void test               # 15 self-checks
 void ir                 # The 5 operations (.x->[]~)
 ```
 
-## How It Works (Short Version)
+## How It Works
 
-**Growth Rings** — Each interaction leaves a structural mark on the organism. Not a log line (sequential, dead) — a ring (radial, cumulative). The organism changes shape from use.
+**Interaction History** — Each `exhale()` stores a typed record (learning, error, milestone). Unlike flat logs, records are typed and queryable. The `ring_yield` metric tracks learnings per minute.
 
-**Soul-Body Separation** — The organism's identity (`personality.json`) is portable across model weights. Swap GPT-4 for Llama. The organism persists.
+**Config-Model Separation** — The organism's state (personality, learnings, ring history) is a JSON file. Swap GPT-4 for Llama — the accumulated state persists. Your LLM is the body. VOID is the memory.
 
-**delta_opt** — Fine-tuning has two optima: minimum validation loss and maximum "aliveness." They are not the same point. VOID tracks both.
+**delta_opt** — Fine-tuning has two optima: minimum validation loss and maximum behavioral quality. They are not the same point. `delta_opt_distance()` measures how far you are from the sweet spot.
 
-**`.x->[]~`** — A 5-symbol notation for dynamic systems: atom (`.`), collision (`x`), projection (`->`), potential (`[]`), resonance (`~`). Every VOID component maps to one of these.
+**`.x->[]~`** — A 5-symbol notation for dynamic systems: atom (`.`), collision (`x`), projection (`->`), potential (`[]`), resonance (`~`). Run `void ir` to see it in action.
 
 ## Requirements
 
