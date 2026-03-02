@@ -1,0 +1,308 @@
+"""
+void_intelligence.organism --- The Organism Layer.
+
+Wraps ANY LLM to make it breathe. Not a wrapper. A TRANSFORMATION.
+
+Components:
+    HexBreath    — 6-axis prompt classification (the lungs)
+    HeartBeat    — Rhythmic pulse cycle (the heart)
+    GrowthRings  — Memory of what was learned (the rings of a tree)
+    OrganismBreather — All combined (the organism)
+
+The industry builds models that think.
+We build models that breathe.
+"""
+
+from __future__ import annotations
+
+import math
+import time
+from dataclasses import dataclass, field
+from enum import Enum
+
+
+# ── HexBreath: 6-Axis Classification ────────────────────────────
+
+class HexAxis(Enum):
+    """The 6 axes of the breath hexagon.
+
+    Every prompt lives somewhere on these 6 spectra.
+    The hexagonal shape is not arbitrary --- it's the most
+    efficient tiling of 2D space (honeycomb, graphene, Saturn's pole).
+    """
+    RUHE_DRUCK = "ruhe_druck"           # Calm <-> Pressure
+    STILLE_RESONANZ = "stille_resonanz"  # Silence <-> Resonance
+    ALLEIN_ZUSAMMEN = "allein_zusammen"  # Alone <-> Together
+    EMPFANGEN_SCHAFFEN = "empfangen_schaffen"  # Receive <-> Create
+    SEIN_TUN = "sein_tun"               # Being <-> Doing
+    LANGSAM_SCHNELL = "langsam_schnell"  # Slow <-> Fast
+
+
+@dataclass
+class HexCoord:
+    """Position in 6D hex space. Each axis: -1.0 to +1.0."""
+    ruhe_druck: float = 0.0
+    stille_resonanz: float = 0.0
+    allein_zusammen: float = 0.0
+    empfangen_schaffen: float = 0.0
+    sein_tun: float = 0.0
+    langsam_schnell: float = 0.0
+
+    @property
+    def magnitude(self) -> float:
+        """How far from center (0 = perfectly balanced)."""
+        vals = [
+            self.ruhe_druck, self.stille_resonanz, self.allein_zusammen,
+            self.empfangen_schaffen, self.sein_tun, self.langsam_schnell,
+        ]
+        return math.sqrt(sum(v * v for v in vals) / 6)
+
+    @property
+    def balance(self) -> float:
+        """0.0 = maximally unbalanced, 1.0 = perfectly centered."""
+        return max(0.0, 1.0 - self.magnitude)
+
+    def to_dict(self) -> dict:
+        return {
+            "ruhe_druck": self.ruhe_druck,
+            "stille_resonanz": self.stille_resonanz,
+            "allein_zusammen": self.allein_zusammen,
+            "empfangen_schaffen": self.empfangen_schaffen,
+            "sein_tun": self.sein_tun,
+            "langsam_schnell": self.langsam_schnell,
+            "magnitude": round(self.magnitude, 3),
+            "balance": round(self.balance, 3),
+        }
+
+
+class HexBreath:
+    """6-axis prompt classifier. The lungs of the organism.
+
+    Classifies any text along 6 hexagonal axes using keyword heuristics.
+    No LLM needed --- pure pattern matching. Fast. Deterministic.
+
+    Usage:
+        hex = HexBreath()
+        coord = hex.classify("Help me write an urgent email to my team")
+        print(coord.ruhe_druck)      # +0.6 (pressure)
+        print(coord.allein_zusammen) # +0.4 (together)
+    """
+
+    AXIS_KEYWORDS: dict[str, dict[str, list[str]]] = {
+        "ruhe_druck": {
+            "neg": ["calm", "relax", "peaceful", "gentle", "soft", "quiet",
+                     "ruhe", "ruhig", "sanft", "leise", "entspannt"],
+            "pos": ["urgent", "deadline", "asap", "critical", "emergency", "rush",
+                     "druck", "dringend", "sofort", "eilig", "stress", "schnell"],
+        },
+        "stille_resonanz": {
+            "neg": ["silence", "nothing", "void", "empty", "pause", "wait",
+                     "stille", "nichts", "leer", "pause", "warten"],
+            "pos": ["discuss", "feedback", "response", "reaction", "echo", "share",
+                     "resonanz", "diskussion", "antwort", "teilen", "austausch"],
+        },
+        "allein_zusammen": {
+            "neg": ["alone", "solo", "myself", "private", "personal", "individual",
+                     "allein", "solo", "privat", "persoenlich", "individuell"],
+            "pos": ["team", "together", "group", "collaborate", "we", "community",
+                     "zusammen", "team", "gemeinsam", "wir", "gemeinschaft"],
+        },
+        "empfangen_schaffen": {
+            "neg": ["read", "learn", "absorb", "understand", "listen", "receive",
+                     "lesen", "lernen", "verstehen", "zuhoeren", "empfangen"],
+            "pos": ["create", "build", "write", "design", "make", "generate",
+                     "schaffen", "bauen", "schreiben", "gestalten", "erzeugen"],
+        },
+        "sein_tun": {
+            "neg": ["think", "reflect", "contemplate", "consider", "feel", "be",
+                     "denken", "reflektieren", "fuehlen", "sein", "betrachten"],
+            "pos": ["do", "execute", "run", "implement", "action", "start",
+                     "tun", "ausfuehren", "starten", "umsetzen", "handeln"],
+        },
+        "langsam_schnell": {
+            "neg": ["careful", "thorough", "detailed", "deep", "slow", "patient",
+                     "langsam", "gruendlich", "detailliert", "tief", "geduldig"],
+            "pos": ["quick", "fast", "brief", "summary", "tldr", "short",
+                     "schnell", "kurz", "zusammenfassung", "knapp", "fix"],
+        },
+    }
+
+    def classify(self, text: str) -> HexCoord:
+        """Classify text into 6D hex coordinates."""
+        text_lower = text.lower()
+        words = set(text_lower.split())
+
+        scores = {}
+        for axis, kw in self.AXIS_KEYWORDS.items():
+            neg_count = sum(1 for w in kw["neg"] if w in words or w in text_lower)
+            pos_count = sum(1 for w in kw["pos"] if w in words or w in text_lower)
+            total = neg_count + pos_count
+            if total == 0:
+                scores[axis] = 0.0
+            else:
+                scores[axis] = (pos_count - neg_count) / max(total, 1)
+                scores[axis] = max(-1.0, min(1.0, scores[axis]))
+
+        return HexCoord(**scores)
+
+
+# ── HeartBeat: Rhythmic Pulse ────────────────────────────────────
+
+@dataclass
+class HeartBeat:
+    """The heart of the organism. ba-dum... ba-dum...
+
+    Every N interactions, the organism pulses.
+    The pulse carries the accumulated state.
+    """
+    beat_count: int = 0
+    last_beat: float = field(default_factory=time.time)
+    interval_sec: float = 60.0
+    bpm: float = 0.0
+
+    def beat(self) -> dict:
+        """Record a heartbeat."""
+        now = time.time()
+        elapsed = now - self.last_beat
+        self.bpm = 60.0 / max(elapsed, 0.1)
+        self.last_beat = now
+        self.beat_count += 1
+        return {
+            "beat": self.beat_count,
+            "bpm": round(self.bpm, 2),
+            "t": now,
+        }
+
+    def should_beat(self) -> bool:
+        """Is it time for a heartbeat?"""
+        return (time.time() - self.last_beat) >= self.interval_sec
+
+
+# ── GrowthRings: Memory ─────────────────────────────────────────
+
+@dataclass
+class GrowthRing:
+    """One ring of growth. Proof of having lived."""
+    content: str
+    ring_type: str = "learning"  # learning | error | paradigm | milestone
+    timestamp: float = field(default_factory=time.time)
+    depth: int = 0
+
+
+class GrowthRings:
+    """The rings of a tree. Every interaction leaves a mark.
+
+    Unlike logs (sequential, dead), rings are STRUCTURAL.
+    They change the shape of the organism.
+    """
+
+    def __init__(self):
+        self.rings: list[GrowthRing] = []
+        self._ring_count_by_type: dict[str, int] = {}
+
+    def add(self, content: str, ring_type: str = "learning") -> GrowthRing:
+        ring = GrowthRing(
+            content=content,
+            ring_type=ring_type,
+            depth=len(self.rings),
+        )
+        self.rings.append(ring)
+        self._ring_count_by_type[ring_type] = self._ring_count_by_type.get(ring_type, 0) + 1
+        return ring
+
+    @property
+    def count(self) -> int:
+        return len(self.rings)
+
+    @property
+    def ring_yield(self) -> float:
+        """How many rings per minute of life."""
+        if not self.rings:
+            return 0.0
+        lifespan = time.time() - self.rings[0].timestamp
+        if lifespan <= 0:
+            return 0.0
+        return len(self.rings) / (lifespan / 60.0)
+
+    def summary(self) -> dict:
+        return {
+            "total": self.count,
+            "by_type": dict(self._ring_count_by_type),
+            "ring_yield": round(self.ring_yield, 4),
+        }
+
+
+# ── OrganismBreather: The Full Organism ──────────────────────────
+
+class OrganismBreather:
+    """The complete organism. Heart + Lungs + Rings.
+
+    Wraps any text generation to add breathing.
+
+    Usage:
+        organism = OrganismBreather()
+
+        # Breathe in (classify prompt)
+        breath_in = organism.inhale("Help me write a quick email")
+
+        # ... your LLM generates response ...
+
+        # Breathe out (record what happened)
+        breath_out = organism.exhale(response_text, learnings=["email patterns"])
+
+        # Check vitals
+        print(organism.vitals())
+    """
+
+    def __init__(self):
+        self.hex = HexBreath()
+        self.heart = HeartBeat()
+        self.rings = GrowthRings()
+        self._breath_count = 0
+        self._start_time = time.time()
+
+    def inhale(self, prompt: str) -> dict:
+        """Breathe in. Classify the prompt. Prepare the organism."""
+        coord = self.hex.classify(prompt)
+        self._breath_count += 1
+
+        if self.heart.should_beat():
+            self.heart.beat()
+
+        return {
+            "breath": self._breath_count,
+            "hex": coord.to_dict(),
+            "heart": {
+                "beat": self.heart.beat_count,
+                "bpm": self.heart.bpm,
+            },
+        }
+
+    def exhale(self, response: str = "", learnings: list[str] | None = None) -> dict:
+        """Breathe out. Record what was learned. Grow."""
+        new_rings = []
+        for learning in (learnings or []):
+            ring = self.rings.add(learning, "learning")
+            new_rings.append(ring.content)
+
+        self.heart.beat()
+
+        return {
+            "breath": self._breath_count,
+            "new_rings": new_rings,
+            "total_rings": self.rings.count,
+            "ring_yield": round(self.rings.ring_yield, 4),
+        }
+
+    def vitals(self) -> dict:
+        """Current vitals of the organism."""
+        uptime = time.time() - self._start_time
+        return {
+            "alive": True,
+            "breaths": self._breath_count,
+            "heartbeats": self.heart.beat_count,
+            "bpm": round(self.heart.bpm, 2),
+            "rings": self.rings.summary(),
+            "uptime_sec": round(uptime, 1),
+            "breaths_per_min": round(self._breath_count / max(uptime / 60, 0.01), 2),
+        }

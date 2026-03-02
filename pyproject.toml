@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "void-intelligence"
+version = "0.1.0"
+description = "The industry builds models that THINK. We build models that BREATHE."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Julian Guggeis", email = "julian@guggeis.de" },
+]
+keywords = ["ai", "llm", "organism", "breathing", "void", "intelligence", "fine-tuning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.optional-dependencies]
+watch = ["watchdog>=3.0"]
+mlx = ["mlx>=0.21", "mlx-lm>=0.21"]
+all = ["watchdog>=3.0", "mlx>=0.21", "mlx-lm>=0.21"]
+
+[project.scripts]
+void = "void_intelligence.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/guggeis/void-intelligence"
+Documentation = "https://void.guggeis.de"
+
+[tool.hatch.build.targets.wheel]
+packages = ["void_intelligence"]
