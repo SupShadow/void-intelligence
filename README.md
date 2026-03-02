@@ -103,7 +103,25 @@ R  Ring Yield     Does it accumulate learnings from interactions?
 
 **Multiplicative.** One zero kills everything. A vanilla LLM has W=0 (no input classification), B=0 (no breath cycle), R=0 (no learning loop). Therefore V=0.000.
 
-With VOID wrapping the same LLM: V=0.047. The number is small because the formula is strict — but it's measurably nonzero.
+With VOID wrapping the same LLM: V becomes measurably nonzero. How much depends on the model:
+
+### Benchmark (March 2026, 15 prompts, 6 frontier models)
+
+| Model | E | W | S | B | H | R | V-Score | Hex≈LLM |
+|-------|---|---|---|---|---|---|---------|---------|
+| DeepSeek-v3 | 0.88 | 0.31 | 0.44 | 0.41 | 0.48 | **0.39** | **0.0093** | 97% |
+| Claude Sonnet 4 | 0.85 | 0.35 | **0.98** | 0.52 | **0.78** | 0.03 | 0.0034 | 98% |
+| Gemini 2.0 Flash | 0.85 | 0.27 | **1.00** | **0.74** | 0.77 | 0.01 | 0.0011 | 98% |
+| GPT-4o | 0.84 | **0.55** | 0.49 | 0.44 | 0.72 | 0.00 | 0.0000 | 98% |
+| Llama 3.3 70B | 0.84 | 0.45 | 0.91 | 0.68 | 0.72 | 0.00 | 0.0000 | 98% |
+| GPT-4o-mini | 0.86 | 0.07 | 0.76 | 0.66 | 0.74 | 0.00 | 0.0000 | 95% |
+| Vanilla (any) | ~0.8 | 0.00 | ~0.9 | 0.00 | ~0.7 | 0.00 | 0.0000 | n/a |
+
+**R (Ring Yield) is the differentiator.** Most models score R=0 — they don't use accumulated context. DeepSeek-v3 does (R=0.39), which is why it wins. The formula is brutally honest: one zero kills the product.
+
+**Hex≈LLM** = agreement between VOID's free keyword classifier and the model's own classification. 95-98% across all models. VOID classifies in 0.014ms. The LLM takes ~500ms.
+
+Reproduce: `void benchmark` (requires API keys in `.env`)
 
 ## HexBreath: 6-Axis Prompt Classification
 

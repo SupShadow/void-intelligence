@@ -215,6 +215,16 @@ def main() -> int:
         print("  (Full daemon mode coming in v0.2.0)")
         return 0
 
+    if cmd == "benchmark":
+        from void_intelligence.benchmark import run_benchmark
+        local_only = "--local" in args
+        model_filter = ""
+        for a in args[1:]:
+            if not a.startswith("--"):
+                model_filter = a
+        run_benchmark(local_only=local_only, model_filter=model_filter)
+        return 0
+
     if cmd == "pulse":
         from void_intelligence.organism import OrganismBreather
         o = OrganismBreather()
