@@ -211,7 +211,7 @@ def make_openrouter(model: str = "google/gemini-2.0-flash-001") -> Optional[Call
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         resp = client.chat.completions.create(
-            model=model, messages=messages, temperature=0, max_tokens=512,
+            model=model, messages=messages, temperature=0, max_tokens=1024,
         )
         return resp.choices[0].message.content or ""
     call.__name__ = model.split("/")[-1]
