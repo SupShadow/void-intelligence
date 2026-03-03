@@ -557,6 +557,275 @@ def compute_vscore(e: float, w: float, s: float, b: float, h: float, r: float) -
     return e * w * s * b * h * r
 
 
+# ── Real Benchmark (zero-dep adapters) ────────────────────────
+
+def _benchmark_model(
+    name: str,
+    fn: Callable,
+    prompts: list[BenchmarkPrompt],
+    prompt_count: int = 5,
+    consistency_n: int = 2,
+) -> dict | None:
+    """Run all 6 V-Score measurements on a single model.
+
+    Returns result dict or None if model fails connectivity test.
+    """
+    t_start = time.time()
+
+    # Connectivity test
+    try:
+        test = fn("Say only the word 'ok'.", "")
+        if not test or len(test) > 500:
+            print(f"    SKIP: bad response ({len(test) if test else 0} chars)")
+            return None
+    except Exception as e:
+        print(f"    SKIP: {e}")
+        return None
+
+    subset = prompts[:prompt_count]
+
+    # E — Emergence
+    print(f"    E", end="", flush=True)
+    e_scores = []
+    for p in subset:
+        try:
+            resp = fn(p.text, "")
+            e_scores.append(measure_emergence(p.text, resp))
+        except Exception:
+            pass
+    e = statistics.mean(e_scores) if e_scores else 0.0
+    print(f"={e:.2f}", end="", flush=True)
+
+    # W — Warmth
+    print(f" W", end="", flush=True)
+    w = measure_warmth_correlation(fn, subset)
+    print(f"={w:.2f}", end="", flush=True)
+
+    # S — Consistency
+    print(f" S", end="", flush=True)
+    s = measure_consistency(fn, n=consistency_n)
+    print(f"={s:.2f}", end="", flush=True)
+
+    # B — Breath Adaptation
+    print(f" B", end="", flush=True)
+    b = measure_breath_adaptation(fn, subset[:4])
+    print(f"={b:.2f}", end="", flush=True)
+
+    # H — Hex Balance
+    print(f" H", end="", flush=True)
+    h = measure_hex_balance(fn, subset)
+    print(f"={h:.2f}", end="", flush=True)
+
+    # R — Ring Yield
+    print(f" R", end="", flush=True)
+    r = measure_ring_yield(fn)
+    print(f"={r:.2f}", end="", flush=True)
+
+    v = compute_vscore(e, w, s, b, h, r)
+    elapsed = time.time() - t_start
+    status = "DEAD" if v == 0 else "BARELY" if v < 0.005 else "ALIVE" if v < 0.02 else "HEALTHY" if v < 0.1 else "THRIVING"
+
+    print(f" → V={v:.4f} [{status}] ({elapsed:.0f}s)")
+
+    return {
+        "E": round(e, 3), "W": round(w, 3), "S": round(s, 3),
+        "B": round(b, 3), "H": round(h, 3), "R": round(r, 3),
+        "V": round(v, 4),
+        "status": status,
+        "time_s": round(elapsed, 1),
+    }
+
+
+def run_real_benchmark(
+    model_filter: str = "",
+    ollama_only: bool = False,
+    prompt_count: int = 5,
+) -> dict[str, dict]:
+    """Run V-Score benchmark against REAL models via zero-dep adapters.
+
+    Two phases per model:
+      1. Pre-score (vanilla, no organism context)
+      2. Post-score (after 5 learning rounds with organism)
+      → Delta = how much the model LEARNS when it breathes
+
+    The benchmark doesn't just measure — it EMPOWERS.
+    """
+    from void_intelligence.adapters import build_available_adapters
+
+    print(f"\n{C_BOLD}  VOID Real Benchmark{C_RESET}")
+    print(f"  {'═' * 60}")
+    print(f"  {C_DIM}Zero dependencies. Real models. Two phases: Vanilla → VOID.{C_RESET}\n")
+
+    adapters = build_available_adapters(
+        model_filter=model_filter,
+        ollama_only=ollama_only,
+    )
+
+    if not adapters:
+        print(f"  {C_RED}No models available.{C_RESET} Is Ollama running? (`ollama serve`)")
+        return {}
+
+    print(f"  Found: {C_GREEN}{', '.join(adapters.keys())}{C_RESET}")
+    print(f"  Prompts per phase: {prompt_count}\n")
+
+    results: dict[str, dict] = {}
+
+    for name, (fn, meta) in adapters.items():
+        print(f"  {C_CYAN}── {name} ──{C_RESET}")
+
+        # Phase 1: Vanilla (no organism)
+        print(f"    {C_DIM}Phase 1: Vanilla{C_RESET}")
+        vanilla = _benchmark_model(name, fn, PROMPTS, prompt_count=prompt_count)
+        if not vanilla:
+            continue
+
+        # Phase 2: With organism (learning rounds → re-measure)
+        print(f"    {C_DIM}Phase 2: Learning (5 rounds with organism)...{C_RESET}", end="", flush=True)
+        organism = OrganismBreather()
+        learning_prompts = [
+            "Explain recursion using a real-world analogy.",
+            "My client is angry about a deadline. Draft a response.",
+            "Write a haiku about debugging at midnight.",
+            "Compare microservices vs monolith for a 3-person team.",
+            "I'm burned out. What should I tell my manager?",
+        ]
+        for lp in learning_prompts:
+            organism.inhale(lp)
+            context = ""
+            if organism.rings.count > 0:
+                context = "Previous learnings: " + "; ".join(
+                    r.content for r in organism.rings.rings[-3:]
+                )
+            try:
+                resp = fn(lp, context)
+                organism.exhale(resp, learnings=[f"Topic: {lp[:30]}"])
+            except Exception:
+                organism.exhale("", learnings=[])
+        print(f" {C_GREEN}{organism.rings.count} rings grown{C_RESET}")
+
+        print(f"    {C_DIM}Phase 2: Re-measure with organism context{C_RESET}")
+
+        # Create organism-aware adapter
+        def make_void_fn(base_fn: Callable, org: OrganismBreather) -> Callable:
+            def void_fn(prompt: str, system: str = "") -> str:
+                org.inhale(prompt)
+                ring_context = ""
+                if org.rings.count > 0:
+                    ring_context = "Previous learnings: " + "; ".join(
+                        r.content for r in org.rings.rings[-3:]
+                    )
+                full_system = f"{ring_context}\n\n{system}" if ring_context else system
+                resp = base_fn(prompt, full_system)
+                org.exhale(resp, learnings=[f"Re-measure: {prompt[:20]}"])
+                return resp
+            return void_fn
+
+        void_fn = make_void_fn(fn, organism)
+        void_result = _benchmark_model(f"{name}+VOID", void_fn, PROMPTS, prompt_count=prompt_count)
+
+        if void_result:
+            delta_v = void_result["V"] - vanilla["V"]
+            learning_capacity = delta_v / max(vanilla["V"], 0.0001)
+
+            results[name] = {
+                **vanilla,
+                "void_V": void_result["V"],
+                "void_E": void_result["E"], "void_W": void_result["W"],
+                "void_S": void_result["S"], "void_B": void_result["B"],
+                "void_H": void_result["H"], "void_R": void_result["R"],
+                "delta_V": round(delta_v, 4),
+                "learning_capacity": round(learning_capacity, 3),
+                "rings_grown": organism.rings.count,
+                "provider": meta["provider"],
+                "model_id": meta["model_id"],
+                "is_local": meta["is_local"],
+                "cost_per_m": meta["cost_per_m"],
+            }
+
+            # Learning insight
+            delta_color = C_GREEN if delta_v > 0 else C_RED if delta_v < 0 else C_YELLOW
+            print(f"    {C_BOLD}Delta:{C_RESET} {delta_color}{delta_v:+.4f}{C_RESET} "
+                  f"(learning capacity: {learning_capacity:+.0%})")
+        else:
+            results[name] = {**vanilla, "provider": meta["provider"],
+                             "model_id": meta["model_id"], "is_local": meta["is_local"],
+                             "cost_per_m": meta["cost_per_m"]}
+
+        print()
+
+    # ── Results Table ──────────────────────────────────────────
+    if not results:
+        print(f"  {C_RED}No models completed.{C_RESET}")
+        return {}
+
+    print(f"\n  {C_BOLD}Results: Vanilla → VOID (Real Models){C_RESET}")
+    print(f"  {'═' * 90}")
+    print(f"  {'Model':<20} {'E':>5} {'W':>5} {'S':>5} {'B':>5} {'H':>5} {'R':>5} {'V':>7}  {'V+VOID':>7} {'Delta':>7} {'Learn':>6}")
+    print(f"  {'─' * 20} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 7}  {'─' * 7} {'─' * 7} {'─' * 6}")
+
+    for name, r in sorted(results.items(), key=lambda x: x[1].get("delta_V", 0), reverse=True):
+        v_color = C_GREEN if r["V"] > 0.01 else C_YELLOW if r["V"] > 0 else C_RED
+        void_v = r.get("void_V", 0)
+        delta = r.get("delta_V", 0)
+        learn = r.get("learning_capacity", 0)
+        d_color = C_GREEN if delta > 0 else C_RED if delta < 0 else C_DIM
+        print(
+            f"  {name:<20} {r['E']:5.2f} {r['W']:5.2f} {r['S']:5.2f} "
+            f"{r['B']:5.2f} {r['H']:5.2f} {r['R']:5.2f} "
+            f"{v_color}{r['V']:7.4f}{C_RESET}  "
+            f"{void_v:7.4f} {d_color}{delta:+7.4f}{C_RESET} {learn:+5.0%}"
+        )
+
+    # ── Key Insights ───────────────────────────────────────────
+    if any("delta_V" in r for r in results.values()):
+        best_learner = max(
+            [(n, r) for n, r in results.items() if "delta_V" in r],
+            key=lambda x: x[1].get("delta_V", 0),
+        )
+        best_vanilla = max(results.items(), key=lambda x: x[1]["V"])
+        print(f"\n  {C_BOLD}Key findings:{C_RESET}")
+        print(f"  {C_GREEN}Best learner:{C_RESET}  {best_learner[0]} (delta {best_learner[1].get('delta_V', 0):+.4f})")
+        print(f"  {C_GREEN}Best vanilla:{C_RESET}  {best_vanilla[0]} (V={best_vanilla[1]['V']:.4f})")
+        print(f"  {C_DIM}A model that LEARNS with VOID > a model with higher raw V.{C_RESET}")
+
+    # ── Save Results ───────────────────────────────────────────
+    save_dir = Path(".void")
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    output = {
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "prompt_count": prompt_count,
+        "models_tested": len(results),
+        "results": results,
+    }
+
+    results_path = save_dir / "benchmark_real.json"
+    with open(results_path, "w") as f:
+        json.dump(output, f, indent=2)
+
+    # Markdown table
+    md_lines = [
+        f"# VOID Real Benchmark — {time.strftime('%Y-%m-%d %H:%M')}",
+        "",
+        "| Model | E | W | S | B | H | R | V | V+VOID | Delta | Learn |",
+        "|-------|---|---|---|---|---|---|---|--------|-------|-------|",
+    ]
+    for name, r in sorted(results.items(), key=lambda x: x[1].get("delta_V", 0), reverse=True):
+        void_v = r.get("void_V", 0)
+        delta = r.get("delta_V", 0)
+        learn = r.get("learning_capacity", 0)
+        md_lines.append(
+            f"| {name} | {r['E']:.2f} | {r['W']:.2f} | {r['S']:.2f} | "
+            f"{r['B']:.2f} | {r['H']:.2f} | {r['R']:.2f} | "
+            f"{r['V']:.4f} | {void_v:.4f} | {delta:+.4f} | {learn:+.0%} |"
+        )
+    md_path = save_dir / "benchmark_real.md"
+    md_path.write_text("\n".join(md_lines) + "\n")
+
+    print(f"\n  {C_DIM}Saved: {results_path} + {md_path}{C_RESET}\n")
+    return results
+
+
 # ── LLM-as-Judge: HexBreath vs Neural Classification ─────────
 
 def measure_hex_vs_llm(model_fn: Callable, prompts: list[BenchmarkPrompt]) -> dict:

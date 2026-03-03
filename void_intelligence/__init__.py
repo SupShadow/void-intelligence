@@ -209,6 +209,16 @@ from void_intelligence.supra import (
     DELTA_OPT,
 )
 
+from void_intelligence.adapters import (
+    make_ollama,
+    make_gemini,
+    make_codex,
+    detect_available,
+    build_adapter,
+    build_available_adapters,
+    MODEL_REGISTRY,
+)
+
 __version__ = "2.0.0"
 
 __all__ = [
@@ -274,4 +284,8 @@ __all__ = [
     # Supraleitend (v2.0.0) — δ_opt friction, NOT zero friction
     "SupraOrganism", "SupraVitals",
     "StribeckHexagon", "FrictionAxis", "DELTA_OPT",
+    # Adapters (v2.1.0) — zero-dep model adapters
+    "make_ollama", "make_gemini", "make_codex",
+    "detect_available", "build_adapter", "build_available_adapters",
+    "MODEL_REGISTRY",
 ]

@@ -2226,13 +2226,22 @@ def main() -> int:
         return 0
 
     if cmd == "benchmark":
-        from void_intelligence.benchmark import run_benchmark
         local_only = "--local" in args
+        real_mode = "--real" in args
+        ollama_only = "--ollama" in args
         model_filter = ""
         for a in args[1:]:
             if not a.startswith("--"):
                 model_filter = a
-        run_benchmark(local_only=local_only, model_filter=model_filter)
+        if real_mode:
+            from void_intelligence.benchmark import run_real_benchmark
+            run_real_benchmark(
+                model_filter=model_filter,
+                ollama_only=ollama_only,
+            )
+        else:
+            from void_intelligence.benchmark import run_benchmark
+            run_benchmark(local_only=local_only, model_filter=model_filter)
         return 0
 
     if cmd == "pulse":
