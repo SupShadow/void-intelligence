@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "void-intelligence"
-version = "0.1.0"
-description = "The industry builds models that THINK. We build models that BREATHE."
+version = "0.2.0"
+description = "65% of frontier AI is dead. V-Score measures which models actually learn. Zero dependencies."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Julian Guggeis", email = "julian@guggeis.de" },
 ]
-keywords = ["ai", "llm", "organism", "breathing", "void", "intelligence", "fine-tuning"]
+keywords = ["ai", "llm", "v-score", "model-routing", "adaptive-ai", "compound-intelligence", "void", "intelligence", "fine-tuning", "experience-memory"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

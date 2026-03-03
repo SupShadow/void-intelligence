@@ -107,6 +107,53 @@ def cmd_test():
     vitals = organism.vitals()
     check("Organism vitals", vitals["alive"] is True)
 
+    # Organism persistence tests
+    state = organism.to_dict()
+    check("Organism to_dict", state["breath_count"] == 1 and len(state["rings"]) == 1)
+    restored = OrganismBreather.from_dict(state)
+    check("Organism from_dict roundtrip", restored._breath_count == 1 and restored.rings.count == 1)
+    check("Organism from_dict rings", restored.rings.rings[0].content == "learned something")
+    bad_restore = OrganismBreather.from_dict({"garbage": True})
+    check("Organism from_dict bad data", bad_restore._breath_count == 0)
+
+    # Profile tests
+    from void_intelligence.profiles import VScoreProfile, BUNDLED_PROFILES
+    check("Profiles loaded", len(BUNDLED_PROFILES) >= 30)
+    alive_count = sum(1 for p in BUNDLED_PROFILES.values() if p.alive)
+    check("Profiles alive", alive_count >= 10)
+
+    prof = BUNDLED_PROFILES.get("qwen3-14b")
+    if prof:
+        check("Profile qwen3-14b R=0.99", prof.R > 0.9)
+        check("Profile breath quality", prof.breath_quality > 0.5)
+        aff = prof.hex_affinity(coord)
+        check("Profile hex_affinity", 0.0 <= aff <= 1.0)
+
+    # Router tests
+    from void_intelligence.router import AtemRouter
+    import tempfile
+    from pathlib import Path
+    tmpdir = Path(tempfile.mkdtemp())
+    router = AtemRouter(state_dir=tmpdir)
+    decision = router.inhale("urgent deadline team help build fast")
+    check("Router inhale returns decision", decision.selected_model != "")
+    check("Router system prompt", "Input classified" in decision.system_prompt)
+    check("Router has alternatives", isinstance(decision.alternatives, list))
+
+    # Router with adapter
+    router.register_adapter(decision.selected_model, lambda p, s="": "test response")
+    result = router.breathe("urgent deadline team help")
+    check("Router breathe executes", result.response == "test response")
+    check("Router vitals after", result.vitals_after["alive"] is True)
+
+    # State persistence
+    state_file = tmpdir / "organisms" / decision.selected_model.replace("/", "_").replace(":", "_") / "state.json"
+    check("Router persists state", state_file.exists())
+
+    # Cleanup
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
     print()
     print(f"    {passed}/{total} tests passed.")
     print()
@@ -147,6 +194,81 @@ def cmd_hex(text: str):
     print()
 
 
+def cmd_route(text: str):
+    """Route a prompt through the Atem-Router. Shows decision without execution."""
+    from void_intelligence.router import AtemRouter
+
+    router = AtemRouter()
+    decision = router.inhale(text)
+
+    print()
+    print("  Atem-Router --- Breath-based model routing")
+    print("  " + "=" * 55)
+    print(f'  Input: "{text}"')
+    print()
+
+    # Hex classification
+    coord = decision.hex
+    axes = [
+        ("Calm/Pressure", coord.ruhe_druck),
+        ("Silence/Resonance", coord.stille_resonanz),
+        ("Alone/Together", coord.allein_zusammen),
+        ("Receive/Create", coord.empfangen_schaffen),
+        ("Being/Doing", coord.sein_tun),
+        ("Slow/Fast", coord.langsam_schnell),
+    ]
+    for label, val in axes:
+        direction = "+" if val > 0 else "-" if val < 0 else "="
+        bar_len = int(abs(val) * 15)
+        bar = "#" * bar_len + "." * (15 - bar_len)
+        print(f"    {label:20s} {direction} [{bar}] {val:+.2f}")
+
+    print()
+    p = decision.profile
+    alive_str = "ALIVE" if p.alive else "DEAD"
+    local_str = "LOCAL/FREE" if p.is_local else f"${p.cost_per_m:.2f}/M"
+    print(f"  Selected: {decision.selected_model} ({alive_str}, {local_str})")
+    print(f"  V-Score:  {p.V:.4f}  (E={p.E:.2f} W={p.W:.2f} S={p.S:.2f} B={p.B:.2f} H={p.H:.2f} R={p.R:.2f})")
+    print(f"  Reason:   {decision.reason}")
+
+    if decision.alternatives:
+        print(f"  Runners:  {', '.join(decision.alternatives[:5])}")
+
+    print()
+    print("  System prompt injection:")
+    print("  " + "-" * 55)
+    for line in decision.system_prompt.split("\n"):
+        print(f"    {line}")
+    print("  " + "-" * 55)
+    print()
+
+
+def cmd_profiles():
+    """List all bundled V-Score profiles."""
+    from void_intelligence.profiles import BUNDLED_PROFILES
+
+    alive = [(n, p) for n, p in BUNDLED_PROFILES.items() if p.alive]
+    dead = [(n, p) for n, p in BUNDLED_PROFILES.items() if not p.alive]
+
+    print()
+    print("  V-Score Profiles --- 35 models benchmarked March 2026")
+    print("  " + "=" * 85)
+    print(f"  {'Model':<22} {'E':>5} {'W':>5} {'S':>5} {'B':>5} {'H':>5} {'R':>5} {'V-Score':>8} {'Cost':>8}")
+    print(f"  {'─' * 22} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 8} {'─' * 8}")
+
+    for name, p in sorted(alive, key=lambda x: x[1].V, reverse=True):
+        cost_str = "FREE" if p.is_local else f"${p.cost_per_m:.2f}"
+        print(
+            f"  {name:<22} {p.E:5.2f} {p.W:5.2f} {p.S:5.2f} "
+            f"{p.B:5.2f} {p.H:5.2f} {p.R:5.2f} {p.V:8.4f} {cost_str:>8}"
+        )
+
+    print(f"  {'─' * 22} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 5} {'─' * 8} {'─' * 8}")
+    print(f"  + {len(dead)} dead models (V=0, R=0) --- per-dimension data available")
+    print(f"  Total: {len(BUNDLED_PROFILES)} models | {len(alive)} alive | {len(dead)} dead")
+    print()
+
+
 def cmd_breathe_demo():
     """Run the visual demo."""
     from void_intelligence.demo import run_demo
@@ -172,6 +294,8 @@ def main() -> int:
         print("    void ir               The 5 fundamental operations")
         print("    void test             Self-test")
         print("    void hex \"text\"       Classify text on 6 axes")
+        print("    void route \"text\"     Route a prompt (Atem-Router)")
+        print("    void profiles         List V-Score profiles")
         print("    void --version        Show version")
         print()
         print("  pip install void-intelligence")
@@ -194,6 +318,15 @@ def main() -> int:
     if cmd == "hex":
         text = " ".join(args[1:]) if len(args) > 1 else "hello world"
         cmd_hex(text)
+        return 0
+
+    if cmd == "route":
+        text = " ".join(args[1:]) if len(args) > 1 else "hello world"
+        cmd_route(text)
+        return 0
+
+    if cmd == "profiles":
+        cmd_profiles()
         return 0
 
     if cmd == "breathe":

@@ -306,3 +306,56 @@ class OrganismBreather:
             "uptime_sec": round(uptime, 1),
             "breaths_per_min": round(self._breath_count / max(uptime / 60, 0.01), 2),
         }
+
+    def to_dict(self) -> dict:
+        """Serialize full organism state for persistence."""
+        return {
+            "version": 1,
+            "breath_count": self._breath_count,
+            "start_time": self._start_time,
+            "heart": {
+                "beat_count": self.heart.beat_count,
+                "last_beat": self.heart.last_beat,
+                "interval_sec": self.heart.interval_sec,
+                "bpm": self.heart.bpm,
+            },
+            "rings": [
+                {
+                    "content": r.content,
+                    "ring_type": r.ring_type,
+                    "timestamp": r.timestamp,
+                    "depth": r.depth,
+                }
+                for r in self.rings.rings
+            ],
+            "ring_count_by_type": dict(self.rings._ring_count_by_type),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "OrganismBreather":
+        """Restore from serialized state. Bad data = fresh organism (never crash)."""
+        org = cls()
+        try:
+            org._breath_count = int(data.get("breath_count", 0))
+            org._start_time = float(data.get("start_time", time.time()))
+
+            h = data.get("heart", {})
+            org.heart.beat_count = int(h.get("beat_count", 0))
+            org.heart.last_beat = float(h.get("last_beat", time.time()))
+            org.heart.interval_sec = float(h.get("interval_sec", 60.0))
+            org.heart.bpm = float(h.get("bpm", 0.0))
+
+            for rd in data.get("rings", []):
+                ring = GrowthRing(
+                    content=str(rd.get("content", "")),
+                    ring_type=str(rd.get("ring_type", "learning")),
+                    timestamp=float(rd.get("timestamp", time.time())),
+                    depth=int(rd.get("depth", 0)),
+                )
+                org.rings.rings.append(ring)
+
+            rbt = data.get("ring_count_by_type", {})
+            org.rings._ring_count_by_type = {str(k): int(v) for k, v in rbt.items()}
+        except (TypeError, ValueError, KeyError):
+            return cls()
+        return org

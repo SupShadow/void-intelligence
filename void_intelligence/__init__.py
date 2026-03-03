@@ -53,7 +53,19 @@ from void_intelligence.organism import (
     OrganismBreather,
 )
 
-__version__ = "0.1.0"
+from void_intelligence.profiles import (
+    VScoreProfile,
+    BUNDLED_PROFILES,
+    load_profiles,
+)
+
+from void_intelligence.router import (
+    AtemRouter,
+    AtemDecision,
+    AtemResult,
+)
+
+__version__ = "0.2.0"
 
 __all__ = [
     # IR Types
@@ -68,4 +80,8 @@ __all__ = [
     "delta_opt_distance", "is_at_delta_opt",
     # Organism
     "HexBreath", "HeartBeat", "GrowthRings", "OrganismBreather",
+    # Profiles
+    "VScoreProfile", "BUNDLED_PROFILES", "load_profiles",
+    # Router
+    "AtemRouter", "AtemDecision", "AtemResult",
 ]

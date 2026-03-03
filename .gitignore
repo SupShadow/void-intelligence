@@ -1,8 +1,13 @@
 __pycache__/
 *.pyc
+*.pyo
 *.egg-info/
 dist/
 build/
 .eggs/
 *.egg
 .venv/
+.env
+*.sqlite3
+.void-intelligence/
+SHOW_HN.md

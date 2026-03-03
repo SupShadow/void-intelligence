@@ -1,0 +1,102 @@
+{
+  "timestamp": "2026-03-02 23:43:41",
+  "prompts": 15,
+  "local": {
+    "hex_accuracy": {
+      "accuracy": 0.625,
+      "correct": 15,
+      "total": 24,
+      "misses": [
+        "  MISS: 'The server is down and clients are calli...' ruhe_druck: expected +1, got +0.0",
+        "  MISS: 'I need to reflect on what happened in to...' langsam_schnell: expected -1, got +0.0",
+        "  MISS: 'Let's brainstorm together with the team ...' empfangen_schaffen: expected +1, got +0.0",
+        "  MISS: 'Help the community organize a fundraiser...' sein_tun: expected +1, got +0.0",
+        "  MISS: 'I just got promoted! I can't believe it....' stille_resonanz: expected +1, got +0.0",
+        "  MISS: 'ASAP - the client presentation is in 2 h...' langsam_schnell: expected +1, got +0.0",
+        "  MISS: 'ASAP - the client presentation is in 2 h...' sein_tun: expected +1, got +0.0",
+        "  MISS: 'Sit with me in silence for a moment. I d...' sein_tun: expected -1, got +1.0",
+        "  MISS: 'Let's build a shared document where ever...' allein_zusammen: expected +1, got +0.0"
+      ]
+    },
+    "circuit_breaker": {
+      "overhead_us": 0.24,
+      "time_to_open_ms": 0.01,
+      "circuit_opened": true,
+      "recovery_timeout_s": 0.1
+    },
+    "lost_dimensions": {
+      "passed": 3,
+      "total": 3,
+      "propagation": 1.0
+    },
+    "hex_speed_ms": 0.014
+  },
+  "models": {
+    "gemini-2.0-flash": {
+      "E": 0.846,
+      "W": 0.266,
+      "S": 1.0,
+      "B": 0.743,
+      "H": 0.772,
+      "R": 0.008,
+      "V": 0.0011,
+      "hex_agreement": 0.98,
+      "time_s": 156.3
+    },
+    "gpt-4o-mini": {
+      "E": 0.865,
+      "W": 0.069,
+      "S": 0.762,
+      "B": 0.66,
+      "H": 0.741,
+      "R": 0.0,
+      "V": 0.0,
+      "hex_agreement": 0.95,
+      "time_s": 373.9
+    },
+    "gpt-4o": {
+      "E": 0.841,
+      "W": 0.55,
+      "S": 0.494,
+      "B": 0.436,
+      "H": 0.718,
+      "R": 0.0,
+      "V": 0.0,
+      "hex_agreement": 0.983,
+      "time_s": 309.2
+    },
+    "claude-sonnet-4": {
+      "E": 0.855,
+      "W": 0.354,
+      "S": 0.979,
+      "B": 0.515,
+      "H": 0.783,
+      "R": 0.028,
+      "V": 0.0034,
+      "hex_agreement": 0.983,
+      "time_s": 331.0
+    },
+    "deepseek-v3": {
+      "E": 0.876,
+      "W": 0.314,
+      "S": 0.436,
+      "B": 0.415,
+      "H": 0.483,
+      "R": 0.385,
+      "V": 0.0093,
+      "hex_agreement": 0.967,
+      "time_s": 565.3
+    },
+    "llama-3.3-70b": {
+      "E": 0.837,
+      "W": 0.446,
+      "S": 0.913,
+      "B": 0.682,
+      "H": 0.724,
+      "R": 0.0,
+      "V": 0.0,
+      "hex_agreement": 0.983,
+      "time_s": 670.8
+    }
+  }
+}
