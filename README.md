@@ -6,8 +6,8 @@
 
 > The industry builds models that think. We build models that breathe.
 
-[![v1.0.0](https://img.shields.io/badge/v1.0.0-The_Standard-blue.svg)](CHANGELOG.md)
-[![402 Tests](https://img.shields.io/badge/402_tests-passing-brightgreen.svg)](#self-tests)
+[![v2.0.0](https://img.shields.io/badge/v2.0.0-Supraleitend-blue.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#self-tests)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](#requirements)
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -84,6 +84,8 @@ print(report.markdown())   # publishable report
 pip install void-intelligence
 ```
 
+### The Organism
+
 ```python
 from void_intelligence import OrganismBreather
 
@@ -106,6 +108,30 @@ After 1,000 — no competitor can replicate your accumulated experience.
 
 **Like compound interest, but for AI.**
 
+### The Supraleitend Organism (v2.0)
+
+The full stack. 7 subsystems breathe as one.
+
+```python
+from void_intelligence import SupraOrganism
+
+# Create with any LLM adapter
+supra = SupraOrganism(adapter=my_llm_fn)
+
+# One call. Full stack. Pipeline + Organism + Evolution +
+# Parallel + Embodied + Protocol + Dream.
+result = supra.breathe("My burnout affects client deadlines")
+
+# The organism learns, remembers, dreams, evolves.
+# Cross-domain collisions auto-ingest into embodied memory.
+# Growth rings compound. The Stribeck Hexagon measures health.
+
+vitals = supra.vitals()
+print(vitals.breath_count)      # How many breaths
+print(vitals.friction)          # 6-axis Stribeck Hexagon
+print(supra.delta_opt())        # Distance from optimal friction
+```
+
 ### Claude Code Plugin
 
 ```bash
@@ -127,11 +153,6 @@ Add to `.mcp.json`:
 ```
 
 Claude Code now has a living memory. Every session builds growth rings. The next session is smarter because the previous one lived. [Full setup guide](docs/claude-code-plugin.md)
-
-```bash
-void test     # 402 self-checks, zero dependencies
-void spec     # The V-Score Specification
-```
 
 ---
 
@@ -173,96 +194,100 @@ All 34 profiles: `void profiles`
 
 VOID wraps any LLM — local or API — and gives it biology:
 
-| Capability | What it does | Module |
-|------------|-------------|--------|
-| **Growth Rings** | Persistent memory of what worked, failed, was learned | `organism.py` |
-| **6-Axis Classification** | Keyword-based intent mapping, <0.02ms, no LLM | `organism.py` |
-| **Adaptive Routing** | Pick the model that *learns best*, not scores highest | `router.py` |
-| **Immune System** | 5-layer response quality gate (Swiss Cheese Model) | `immune.py` |
-| **Fractal Knowledge** | Rings form a searchable graph, not a flat list | `ring_graph.py` |
-| **Auto-Tuning** | Parameters converge to the Stribeck sweet spot | `tuner.py` |
-| **Cross-Pollination** | Transfer knowledge between model organisms | `pollinator.py` |
-| **V-Score API** | Score any model in real-time, leaderboard, badges | `api.py` |
-| **Swarm Intelligence** | Distributed mesh, gossip protocol, no leader | `swarm.py` |
-| **Edge Functions** | Stateless pure functions for serverless/IoT | `edge.py` |
-| **Portable Export** | Self-describing JSON, compact mode, lite (<200 chars) | `portable.py` |
-| **The Specification** | Formal spec, compliance checker, certification | `spec.py` |
+| Layer | Capability | Module |
+|------:|------------|--------|
+| **v0.1** | **Organism** — Growth rings, heartbeat, HexBreath classification | `organism.py` |
+| **v0.2** | **V-Router** — Pick the model that *learns best*, not scores best | `router.py` |
+| **v0.3** | **Immune System** — 5-layer Swiss Cheese quality gate | `immune.py` |
+| **v0.4** | **Ring Graph** — Fractal knowledge, TF-IDF search, no vector DB | `ring_graph.py` |
+| **v0.5** | **Stribeck Tuner** — Auto-tune params to the friction sweet spot | `tuner.py` |
+| **v0.6** | **Cross-Pollination** — Transfer knowledge between organisms | `pollinator.py` |
+| **v0.7** | **V-Score API** — Real-time scoring, leaderboard, badges | `api.py` |
+| **v0.8** | **Swarm Network** — Distributed mesh, gossip protocol, no leader | `swarm.py` |
+| **v0.9** | **Edge + Portable** — Stateless functions, universal export, IoT | `edge.py` `portable.py` |
+| **v1.0** | **The Specification** — Open standard, compliance checker, certification | `spec.py` |
+| **v1.1** | **MCP Server** — Claude Code plugin, persistent organism per project | `mcp_server.py` |
+| **v1.2** | **Multi-Eye ×** — N perspectives collide, blind spot detection | `x_eyes.py` |
+| **v1.3** | **IR Pipeline** — `.x->[]~` as computation, adapter pattern | `pipeline.py` |
+| **v1.5** | **Self-Teaching** — Pseudo-labels, hard negatives, LR decay | `evolve.py` |
+| **v1.6** | **Parallel Eyes** — N models breathe simultaneously | `parallel.py` |
+| **v1.7** | **Embodied Memory** — Ebbinghaus decay, amygdala tags, living tissue | `embodied.py` |
+| **v1.8** | **Breathing Protocol** — JSONL wire format, reproducible, streamable | `protocol.py` |
+| **v1.9** | **Dream Layer** — Offline consolidation, silence mining, insight emergence | `dream.py` |
+| **v2.0** | **Supraleitend** — All 7 subsystems as one organism + Stribeck Hexagon | `supra.py` |
 
 Zero dependencies. All of it. stdlib only.
 
 ---
 
-## 8 Geniuses, 10 Versions
+## The Stribeck Hexagon (v2.0)
 
-Each version collides with one genius. Each collision unlocks the next.
+Zero friction = death. Optimal friction = life.
+
+In a real superconductor, Cooper pairs form through **phonons** — lattice vibrations. Remove the lattice, remove superconductivity. The friction BETWEEN layers IS the mechanism.
 
 ```
-v0.1  ──  IR + Organism + HexBreath                    15 tests
-v0.2  ──  V-Router + 34 Profiles                       30 tests
-v0.3  ──  Reason       Immune System                   47 tests
-          "Swiss Cheese: holes must align to fail."
-v0.4  ──  Mandelbrot   Ring Graph                      76 tests
-          "Knowledge is self-similar across scales."
-v0.5  ──  Stribeck     δ_opt Inference                101 tests
-          "Every parameter has a friction sweet spot."
-v0.6  ──  Margulis     Cross-Pollination              134 tests
-          "Mitochondria were once separate organisms."
-v0.7  ──  Page & Brin  V-Score API                    172 tests
-          "They built a better metric, not a better engine."
-v0.8  ──  Gordon       Swarm Network                  246 tests
-          "No ant knows the colony's plan."
-v0.9  ──  Wozniak      VOID Everywhere                302 tests
-          "He made computing accessible, not better."
-v1.0  ──  Berners-Lee  The Standard                   351 tests
-          "Simple. Free. Useful."
+        Memory
+       /      \
+  Protocol    Evolution
+      |          |
+  Parallel    Dream
+       \      /
+       Collision
+
+  6 axes. Hexagonal. δ_opt = 0.4.
+  Sexagons are bestagons.
+```
+
+```python
+from void_intelligence import SupraOrganism
+
+supra = SupraOrganism(adapter=my_llm)
+hex = supra.friction()
+
+print(hex.memory)          # Erinnern ↔ Vergessen
+print(hex.evolution)       # Lernen ↔ Stabilität
+print(hex.dream)           # Konsolidieren ↔ Bewahren
+print(hex.collision)       # Sensibilität ↔ Rauschen
+print(hex.parallel)        # Divergenz ↔ Konvergenz
+print(hex.protocol)        # Kompression ↔ Treue
+
+print(hex.sphere_distance) # L2 distance from δ_opt center
+print(hex.at_delta_opt)    # True if all axes near optimal
+
+# Not zero. Not maximum. δ_opt.
+# Magic Angle = 1.1°. Not 0°, not 30°.
 ```
 
 ---
 
-## The Specification (v1.0.0)
+## 20 Geniuses, 20 Versions
 
-Berners-Lee didn't build the best hypertext system. He built an **open standard** that everyone adopted because it was simple, free, and useful.
+Each version collides with one genius. Each collision unlocks the next.
 
-```python
-from void_intelligence import check_compliance, certify, ModelCard, spec_document
-
-# Validate any V-Score implementation against the spec
-result = check_compliance(my_score_fn)
-result.compliant        # True / False
-result.compliance_rate  # 0.0 - 1.0
-
-# Certify a model
-cert = certify(avg_v=0.12, health_rate=0.95, checks=150)
-cert.name  # "Platinum"
-
-# Standard model card
-card = ModelCard.from_scores("my-model", scores, provider="Acme")
-card.to_markdown()  # publishable
-card.to_json()      # machine-readable
-
-# The spec itself — machine-readable
-doc = spec_document()  # 10 sections, §1-§10
+```
+v0.1  ──              IR + Organism + HexBreath                         15 tests
+v0.2  ──              V-Router + 34 Profiles                            30 tests
+v0.3  ──  Reason      Immune System (Swiss Cheese)                      47 tests
+v0.4  ──  Mandelbrot  Ring Graph (fractal knowledge)                    76 tests
+v0.5  ──  Stribeck    δ_opt Inference (parameter tuning)               101 tests
+v0.6  ──  Margulis    Cross-Pollination (endosymbiosis)                134 tests
+v0.7  ──  Page & Brin V-Score API (the metric)                         172 tests
+v0.8  ──  Gordon      Swarm Network (colony intelligence)              246 tests
+v0.9  ──  Wozniak     VOID Everywhere (edge + portable)                302 tests
+v1.0  ──  Berners-Lee The Standard (open spec)                         351 tests
+v1.1  ──              Claude Code Plugin (MCP server)                  402 tests
+v1.2  ──  al-Haytham  Multi-Eye × Reasoning (perspectives collide)       +51
+v1.3  ──  Turing      IR Pipeline (.x->[]~ as computation)              +63
+v1.5  ──  Hinton      Self-Teaching × Loop (pseudo-labels)               +52
+v1.6  ──  Humboldt    Parallel Eyes (N models breathe)                   +47
+v1.7  ──  Ebbinghaus  Embodied Memory (living tissue)                    +65
+v1.8  ──  Shannon     Breathing Protocol (wire format)                   +63
+v1.9  ──  Walker      Dream Layer (silence mining)                       +47
+v2.0  ──  δ_opt       Supraleitend + Stribeck Hexagon                    +92
 ```
 
-**Wire Format** — any system producing this JSON is V-Score compatible:
-
-```json
-{
-  "V": 0.019,
-  "model": "qwen3-14b",
-  "status": "THRIVING",
-  "components": {"E": 0.82, "W": 0.60, "S": 0.50, "B": 0.87, "H": 0.09}
-}
-```
-
-**Certification:**
-
-| Level | V | Health Rate | Checks |
-|-------|--:|----------:|---------:|
-| Platinum | ≥ 0.10 | ≥ 95% | ≥ 100 |
-| Gold | ≥ 0.05 | ≥ 90% | ≥ 50 |
-| Silver | ≥ 0.02 | ≥ 80% | ≥ 25 |
-| Bronze | ≥ 0.01 | ≥ 60% | ≥ 10 |
+20 versions. 29 modules. 16,735 lines. 2 days.
 
 ---
 
@@ -281,35 +306,6 @@ x   Collision   Two atoms meet — what emerges exists in neither.
 ```
 
 Run `void ir` to see it live.
-
-### The Organism
-
-```python
-organism = OrganismBreather()
-
-organism.inhale(prompt)     # Classify, prepare context
-organism.exhale(response)   # Record growth ring
-organism.vitals()           # Check pulse
-
-# The organism has a heartbeat.
-# It has growth rings like a tree.
-# Swap the model — the memory stays.
-# Your LLM is the body. VOID is the soul.
-```
-
-### The Router
-
-```python
-router = AtemRouter()
-router.register_adapter("qwen3-14b", my_ollama_fn)
-router.register_adapter("claude-3-haiku", my_api_fn)
-
-# One call. VOID picks the model, injects experience, records learnings.
-result = router.breathe("Analyze this forecast")
-# → selected qwen3-14b (R=0.99, learns from context, FREE)
-```
-
-Models that prove themselves over time get preferred. Earned trust, not assumed capability.
 
 ### Self-Awareness
 
@@ -331,10 +327,46 @@ def call_openai(prompt):
 
 ---
 
+## The Specification (v1.0.0)
+
+```python
+from void_intelligence import check_compliance, certify, ModelCard, spec_document
+
+result = check_compliance(my_score_fn)
+result.compliant        # True / False
+result.compliance_rate  # 0.0 - 1.0
+
+cert = certify(avg_v=0.12, health_rate=0.95, checks=150)
+cert.name  # "Platinum"
+
+card = ModelCard.from_scores("my-model", scores, provider="Acme")
+card.to_markdown()  # publishable
+```
+
+**Wire Format** — any system producing this JSON is V-Score compatible:
+
+```json
+{
+  "V": 0.019,
+  "model": "qwen3-14b",
+  "status": "THRIVING",
+  "components": {"E": 0.82, "W": 0.60, "S": 0.50, "B": 0.87, "H": 0.09}
+}
+```
+
+| Level | V | Health Rate | Checks |
+|-------|--:|----------:|---------:|
+| Platinum | >= 0.10 | >= 95% | >= 100 |
+| Gold | >= 0.05 | >= 90% | >= 50 |
+| Silver | >= 0.02 | >= 80% | >= 25 |
+| Bronze | >= 0.01 | >= 60% | >= 10 |
+
+---
+
 ## CLI
 
 ```bash
-void test                  # 377 self-checks
+void test                  # Self-checks
 void breathe --demo        # 30-second visual demo
 void ir                    # .x->[]~
 void hex "text"            # 6-axis classification
@@ -358,7 +390,7 @@ void pulse                 # System vitals
 
 ## Requirements
 
-Python ≥ 3.10. Zero runtime dependencies.
+Python >= 3.10. Zero runtime dependencies.
 
 ```bash
 pip install void-intelligence

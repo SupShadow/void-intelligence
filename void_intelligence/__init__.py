@@ -51,6 +51,7 @@ from void_intelligence.organism import (
     HeartBeat,
     GrowthRings,
     OrganismBreather,
+    OrganismLineage,
 )
 
 from void_intelligence.profiles import (
@@ -148,7 +149,67 @@ from void_intelligence.proof import (
     get_tasks,
 )
 
-__version__ = "1.1.0"
+from void_intelligence.x_eyes import (
+    x_think,
+    x_score,
+    x_delta,
+    collide,
+    EYES,
+    ReasoningEye,
+    CollisionResult,
+    XResult,
+    build_eye_prompt,
+)
+
+from void_intelligence.pipeline import (
+    IRPipeline,
+    BreathCycle,
+)
+
+from void_intelligence.evolve import (
+    EvolutionEngine,
+    EvolutionCycle,
+    PseudoLabel,
+    HardNegative,
+)
+
+from void_intelligence.parallel import (
+    ParallelBreather,
+    ParallelBreathCycle,
+    ModelEye,
+    EyeResult,
+)
+
+from void_intelligence.embodied import (
+    EmbodiedMemory,
+    MemoryAtom,
+    MemorySource,
+)
+
+from void_intelligence.protocol import (
+    BreathFrame,
+    BreathStream,
+    encode as breath_encode,
+    decode as breath_decode,
+    validate as breath_validate,
+    PROTOCOL_VERSION,
+)
+
+from void_intelligence.dream import (
+    DreamEngine,
+    DreamReport,
+    DreamInsight,
+)
+
+from void_intelligence.supra import (
+    SupraOrganism,
+    SupraVitals,
+    StribeckHexagon,
+    FrictionAxis,
+    DELTA_OPT,
+)
+
+__version__ = "2.0.0"
 
 __all__ = [
     # IR Types
@@ -162,7 +223,7 @@ __all__ = [
     "Phase", "current_phase", "phase_aware",
     "delta_opt_distance", "is_at_delta_opt",
     # Organism
-    "HexBreath", "HeartBeat", "GrowthRings", "OrganismBreather",
+    "HexBreath", "HeartBeat", "GrowthRings", "OrganismBreather", "OrganismLineage",
     # Profiles
     "VScoreProfile", "BUNDLED_PROFILES", "load_profiles",
     # Router
@@ -192,4 +253,25 @@ __all__ = [
     "v_score_status", "certify", "check_compliance", "spec_document", "spec_markdown",
     # Proof (v1.1.0)
     "run_proof", "ProofReport", "Task", "get_tasks",
+    # Multi-Eye × Reasoning (v1.2.0)
+    "x_think", "x_score", "x_delta", "collide",
+    "EYES", "ReasoningEye", "CollisionResult", "XResult",
+    "build_eye_prompt",
+    # IR Pipeline (v1.3.0)
+    "IRPipeline", "BreathCycle",
+    # Self-Teaching × Loop (v1.5.0)
+    "EvolutionEngine", "EvolutionCycle", "PseudoLabel", "HardNegative",
+    # Parallel Eyes (v1.6.0)
+    "ParallelBreather", "ParallelBreathCycle", "ModelEye", "EyeResult",
+    # Embodied Memory (v1.7.0)
+    "EmbodiedMemory", "MemoryAtom", "MemorySource",
+    # Breathing Protocol (v1.8.0)
+    "BreathFrame", "BreathStream",
+    "breath_encode", "breath_decode", "breath_validate",
+    "PROTOCOL_VERSION",
+    # Dream Layer (v1.9.0)
+    "DreamEngine", "DreamReport", "DreamInsight",
+    # Supraleitend (v2.0.0) — δ_opt friction, NOT zero friction
+    "SupraOrganism", "SupraVitals",
+    "StribeckHexagon", "FrictionAxis", "DELTA_OPT",
 ]

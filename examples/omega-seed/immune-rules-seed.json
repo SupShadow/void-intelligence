@@ -1,0 +1,155 @@
+{
+  "source": "OMEGA Learned Errors (16 Narben)",
+  "rules": [
+    {
+      "id": "immune_err_20260113_akkusativ_emphasis",
+      "category": "german_grammar",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(halb|voll|hoch|tief|weit|lang|kurz|gut|selbst|wohl|zeit|grund)-\\w+"
+      ],
+      "prevention": "WHEN German output AND visual emphasis (CAPS/Bold/Quotes) THEN extra pass for Kasus-Kongruenz",
+      "test_question": "Nach Styling: Grammatik nochmal geprüft?",
+      "injection": "[LEARNED ERROR err_20260113_akkusativ_emphasis]: WHEN German output AND visual emphasis (CAPS/Bold/Quotes) THEN extra pass for Kasus-Kongruenz",
+      "source_error": "err_20260113_akkusativ_emphasis"
+    },
+    {
+      "id": "immune_err_20260113_marketing_bs",
+      "category": "honesty",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(algorithmus-optimiert|KI-gestützt|AI-powered)"
+      ],
+      "prevention": "WHEN writing recommendations THEN ask: 'Can I defend this claim with evidence?'",
+      "test_question": "Würde ich das vor einem Skeptiker verteidigen können?",
+      "injection": "[LEARNED ERROR err_20260113_marketing_bs]: WHEN writing recommendations THEN ask: 'Can I defend this claim with evidence?'",
+      "source_error": "err_20260113_marketing_bs"
+    },
+    {
+      "id": "immune_err_20260113_paid_ads_eu",
+      "category": "domain_knowledge",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(meta ads|facebook ads|bezahlte werbung.*kampagne)"
+      ],
+      "prevention": "WHEN political campaign AND EU context THEN flag paid advertising as restricted",
+      "test_question": "Ist bezahlte Werbung für diesen Kontext legal?",
+      "injection": "[LEARNED ERROR err_20260113_paid_ads_eu]: WHEN political campaign AND EU context THEN flag paid advertising as restricted",
+      "source_error": "err_20260113_paid_ads_eu"
+    },
+    {
+      "id": "immune_err_20260113_generic_slogan",
+      "category": "brand_awareness",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(straubing kann mehr)"
+      ],
+      "prevention": "WHEN campaign content THEN verify: using official motto/branding?",
+      "test_question": "Ist das der echte Kampagnen-Slogan oder habe ich improvisiert?",
+      "injection": "[LEARNED ERROR err_20260113_generic_slogan]: WHEN campaign content THEN verify: using official motto/branding?",
+      "source_error": "err_20260113_generic_slogan"
+    },
+    {
+      "id": "immune_err_20260113_task_for_code",
+      "category": "cost_waste",
+      "severity": "critical",
+      "patterns": [
+        "(?i)(task.*agent.*code|general-purpose.*generat)"
+      ],
+      "prevention": "WHEN code generation needed THEN use Bash: gemini 'prompt' or ollama run qwen2.5-coder:14b 'prompt' | NEVER use Task tool for code",
+      "test_question": "Nutze ich Task für CODE? Wenn ja: STOPP, nutze gemini/ollama direkt.",
+      "injection": "[LEARNED ERROR err_20260113_task_for_code]: WHEN code generation needed THEN use Bash: gemini 'prompt' or ollama run qwen2.5-coder:14b 'prompt' | NEVER use Task tool for code",
+      "source_error": "err_20260113_task_for_code"
+    },
+    {
+      "id": "immune_err_20260115_gemini_model_name",
+      "category": "external_api",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(gemini-\\d\\.\\d-\\w+-exp)"
+      ],
+      "prevention": "NIEMALS Gemini Modell-Namen raten. Default nutzen oder vorher mit 'gemini --help' prüfen",
+      "test_question": "",
+      "injection": "[LEARNED ERROR err_20260115_gemini_model_name]: NIEMALS Gemini Modell-Namen raten. Default nutzen oder vorher mit 'gemini --help' prüfen",
+      "source_error": "err_20260115_gemini_model_name"
+    },
+    {
+      "id": "immune_err_20260119_fabricated_employee_claim",
+      "category": "CRITICAL_FABRICATION",
+      "severity": "CRITICAL",
+      "patterns": [
+        "(?i)(mitarbeiter|angestellt|betrieb|im betrieb)"
+      ],
+      "prevention": "WHEN writing first-person claims about Julian's business/life THEN ALWAYS check facts-registry.json first | Claims about employees/company structure require explicit verification",
+      "test_question": "Habe ich IRGENDWAS über Julian behauptet das nicht in facts-registry.json steht?",
+      "injection": "[LEARNED ERROR err_20260119_fabricated_employee_claim]: WHEN writing first-person claims about Julian's business/life THEN ALWAYS check facts-registry.json first | Claims about employees/company structure require explicit verification",
+      "source_error": "err_20260119_fabricated_employee_claim"
+    },
+    {
+      "id": "immune_err_20260119_german_hyphen_compounds",
+      "category": "german_grammar",
+      "severity": "low",
+      "patterns": [
+        "(?i)(halb|voll|hoch|tief|weit|lang|kurz|gut|selbst|wohl|zeit|grund)-\\w+"
+      ],
+      "prevention": "WHEN German compound with halb/voll/halb etc. THEN zusammenschreiben, kein Bindestrich",
+      "test_question": "Braucht dieses Kompositum wirklich einen Bindestrich?",
+      "injection": "[LEARNED ERROR err_20260119_german_hyphen_compounds]: WHEN German compound with halb/voll/halb etc. THEN zusammenschreiben, kein Bindestrich",
+      "source_error": "err_20260119_german_hyphen_compounds"
+    },
+    {
+      "id": "immune_err_20260125_stale_financial_data",
+      "category": "data_source_selection",
+      "severity": "high",
+      "patterns": [
+        "data/business/invoices\\.json"
+      ],
+      "prevention": "WHEN financial data needed (invoices, revenue, payments) THEN ALWAYS check data/business/lexoffice/ FIRST, NEVER use data/business/invoices.json directly",
+      "test_question": "Verwende ich Lexoffice-Sync-Daten oder eine veraltete lokale Kopie?",
+      "injection": "[LEARNED ERROR err_20260125_stale_financial_data]: WHEN financial data needed (invoices, revenue, payments) THEN ALWAYS check data/business/lexoffice/ FIRST, NEVER use data/business/invoices.json directly",
+      "source_error": "err_20260125_stale_financial_data"
+    },
+    {
+      "id": "immune_err_20260127_internal_context_hallucination",
+      "category": "CRITICAL_ARCHITECTURE",
+      "severity": "CRITICAL",
+      "patterns": [],
+      "prevention": "WHEN information CAN become stale (models, prices, news) THEN ALWAYS query live API, NEVER trust internal context",
+      "test_question": "Kann diese Information veraltet sein? Wenn ja: Live-API nutzen!",
+      "injection": "[LEARNED ERROR err_20260127_internal_context_hallucination]: WHEN information CAN become stale (models, prices, news) THEN ALWAYS query live API, NEVER trust internal context",
+      "source_error": "err_20260127_internal_context_hallucination"
+    },
+    {
+      "id": "immune_err_20260127_cli_vs_api_strategy",
+      "category": "strategic_architecture",
+      "severity": "medium",
+      "patterns": [],
+      "prevention": "Prefer CLI subscriptions for standard work. Use OpenRouter API only for edge cases and specialized models.",
+      "test_question": "",
+      "injection": "[LEARNED ERROR err_20260127_cli_vs_api_strategy]: Prefer CLI subscriptions for standard work. Use OpenRouter API only for edge cases and specialized models.",
+      "source_error": "err_20260127_cli_vs_api_strategy"
+    },
+    {
+      "id": "immune_err_20260215_collision_bias",
+      "category": "cognitive_bias",
+      "severity": "medium",
+      "patterns": [
+        "(?i)(\\w+ > \\w+|\\w+ → \\w+)"
+      ],
+      "prevention": "FORCED QUESTION: COLLISION CHECK? Habe ich > oder → wo × korrekt ist?",
+      "test_question": "Ist das eine PROJEKTION (>, →) oder die volle REALITÄT (×)?",
+      "injection": "[LEARNED ERROR err_20260215_collision_bias]: FORCED QUESTION: COLLISION CHECK? Habe ich > oder → wo × korrekt ist?",
+      "source_error": "err_20260215_collision_bias"
+    },
+    {
+      "id": "immune_err_20260215_session_death_waste",
+      "category": "protocol_violation",
+      "severity": "medium",
+      "patterns": [],
+      "prevention": "AUTO-PERSIST: Paradigm-Registrierung MUSS current-session.md updaten. Agents MÜSSEN Output auf Disk schreiben BEVOR Context-Report.",
+      "test_question": "",
+      "injection": "[LEARNED ERROR err_20260215_session_death_waste]: AUTO-PERSIST: Paradigm-Registrierung MUSS current-session.md updaten. Agents MÜSSEN Output auf Disk schreiben BEVOR Context-Report.",
+      "source_error": "err_20260215_session_death_waste"
+    }
+  ]
+}

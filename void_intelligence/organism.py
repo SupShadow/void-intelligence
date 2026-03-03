@@ -236,6 +236,58 @@ class GrowthRings:
         }
 
 
+# ── Organism Lineage (v1.4.0) ──────────────────────────────────
+
+@dataclass
+class OrganismLineage:
+    """Evolutionary history of a merged organism.
+
+    Tracks which parent organisms were merged and how.
+    Like a family tree for AI organisms (Margulis endosymbiosis).
+    """
+    parents: list[str] = field(default_factory=list)
+    merge_type: str = ""  # "endosymbiosis" (*) or "pollination" (@)
+    generation: int = 0
+    timestamp: float = field(default_factory=time.time)
+
+
+# ── Graph Merge Helpers (v1.4.0) ───────────────────────────────
+
+def _merge_graph_into(source: "RingGraph", target: "RingGraph") -> dict[str, str]:
+    """Import all active rings from source into target. Returns old->new ID map.
+
+    Cross-organism edges emerge automatically through RingGraph._auto_relate().
+    This is the Margulis magic: knowledge from DIFFERENT organisms creates
+    NEW connections that neither organism had alone.
+    """
+    id_map: dict[str, str] = {}
+    for node in source.nodes.values():
+        if not node.compressed:
+            new_node = target.add(node.content, node.ring_type)
+            id_map[node.id] = new_node.id
+    # Re-create intra-organism edges with mapped IDs
+    for edge in source.edges:
+        new_src = id_map.get(edge.source)
+        new_tgt = id_map.get(edge.target)
+        if new_src and new_tgt:
+            target.connect(new_src, new_tgt, edge.edge_type, edge.weight)
+    return id_map
+
+
+def _merge_valuable_into(
+    source: "RingGraph",
+    target: "RingGraph",
+    types: frozenset[str] = frozenset({"paradigm", "milestone"}),
+) -> dict[str, str]:
+    """Import only high-value rings (paradigms, milestones) from source."""
+    id_map: dict[str, str] = {}
+    for node in source.nodes.values():
+        if not node.compressed and node.ring_type in types:
+            new_node = target.add(node.content, node.ring_type)
+            id_map[node.id] = new_node.id
+    return id_map
+
+
 # ── OrganismBreather: The Full Organism ──────────────────────────
 
 class OrganismBreather:
@@ -258,11 +310,13 @@ class OrganismBreather:
         print(organism.vitals())
     """
 
-    def __init__(self):
+    def __init__(self, name: str = ""):
+        self.name = name
         self.hex = HexBreath()
         self.heart = HeartBeat()
         self.rings = GrowthRings()
         self.graph: RingGraph | None = None  # v0.4.0: fractal ring graph
+        self.lineage: OrganismLineage | None = None  # v1.4.0: merge history
         self._breath_count = 0
         self._start_time = time.time()
         self._last_hex: HexCoord | None = None
@@ -320,23 +374,161 @@ class OrganismBreather:
 
         return result
 
+    # ── Organism Algebra (v1.4.0) ─────────────────────────────────
+
+    def __mul__(self, other: "OrganismBreather") -> "OrganismBreather":
+        """× — Deep endosymbiosis. Two organisms become ONE.
+
+        Margulis (1967): Mitochondria merged with cells.
+        Both contributed everything. The result was MORE than both.
+
+            merged = qwen * gemini  # × operator
+            # merged.x_density > max(qwen.x_density, gemini.x_density)
+        """
+        if not isinstance(other, OrganismBreather):
+            return NotImplemented
+
+        name_a = self.name or "A"
+        name_b = other.name or "B"
+        merged = OrganismBreather(name=f"{name_a}\u00d7{name_b}")
+
+        # Lineage
+        gen = max(
+            self.lineage.generation if self.lineage else 0,
+            other.lineage.generation if other.lineage else 0,
+        )
+        merged.lineage = OrganismLineage(
+            parents=[name_a, name_b],
+            merge_type="endosymbiosis",
+            generation=gen + 1,
+        )
+
+        # Heart: sum beats, average BPM
+        merged.heart.beat_count = self.heart.beat_count + other.heart.beat_count
+        total_bpm = self.heart.bpm + other.heart.bpm
+        merged.heart.bpm = total_bpm / 2 if total_bpm > 0 else 0.0
+        merged.heart.last_beat = max(self.heart.last_beat, other.heart.last_beat)
+
+        # Breaths: sum
+        merged._breath_count = self._breath_count + other._breath_count
+        merged._start_time = min(self._start_time, other._start_time)
+
+        # Rings: merge all from both
+        for ring in self.rings.rings:
+            merged.rings.add(ring.content, ring.ring_type)
+        for ring in other.rings.rings:
+            merged.rings.add(ring.content, ring.ring_type)
+
+        # Graph: deep merge (cross-edges emerge through _auto_relate)
+        if self.graph is not None or other.graph is not None:
+            from void_intelligence.ring_graph import RingGraph
+            merged.graph = RingGraph()
+            if self.graph:
+                _merge_graph_into(self.graph, merged.graph)
+            if other.graph:
+                _merge_graph_into(other.graph, merged.graph)
+
+        return merged
+
+    def __matmul__(self, other: "OrganismBreather") -> "OrganismBreather":
+        """@ — Shallow pollination. Knowledge flows, identity stays.
+
+        Like bees carrying pollen between flowers.
+        Self is the base. Other contributes only paradigms + milestones.
+
+            enriched = qwen @ gemini  # pollination
+            # enriched has qwen's identity + gemini's best knowledge
+        """
+        if not isinstance(other, OrganismBreather):
+            return NotImplemented
+
+        name_a = self.name or "A"
+        name_b = other.name or "B"
+        merged = OrganismBreather(name=f"{name_a}@{name_b}")
+
+        # Lineage
+        gen = max(
+            self.lineage.generation if self.lineage else 0,
+            other.lineage.generation if other.lineage else 0,
+        )
+        merged.lineage = OrganismLineage(
+            parents=[name_a, name_b],
+            merge_type="pollination",
+            generation=gen + 1,
+        )
+
+        # Heart: copy self's heart (base organism)
+        merged.heart.beat_count = self.heart.beat_count
+        merged.heart.bpm = self.heart.bpm
+        merged.heart.last_beat = self.heart.last_beat
+        merged.heart.interval_sec = self.heart.interval_sec
+
+        # Breaths: self only (base organism)
+        merged._breath_count = self._breath_count
+        merged._start_time = self._start_time
+
+        # Rings: all from self + only high-value from other
+        for ring in self.rings.rings:
+            merged.rings.add(ring.content, ring.ring_type)
+        for ring in other.rings.rings:
+            if ring.ring_type in ("paradigm", "milestone"):
+                merged.rings.add(ring.content, ring.ring_type)
+
+        # Graph: self's graph + other's valuable rings
+        if self.graph is not None or other.graph is not None:
+            from void_intelligence.ring_graph import RingGraph
+            merged.graph = RingGraph()
+            if self.graph:
+                _merge_graph_into(self.graph, merged.graph)
+            if other.graph:
+                _merge_valuable_into(other.graph, merged.graph)
+
+        return merged
+
+    @property
+    def x_density(self) -> float:
+        """Emergent quality metric. Cross-topic edges per active ring.
+
+        Higher in merged organisms because diverse knowledge creates
+        more keyword overlap -> more auto-detected edges -> more x opportunities.
+        """
+        if self.graph is None or self.graph.active_count == 0:
+            return 0.0
+        return self.graph.edge_count / self.graph.active_count
+
+    @property
+    def generation(self) -> int:
+        """How many merges deep. 0 = original, 1+ = merged."""
+        return self.lineage.generation if self.lineage else 0
+
     def vitals(self) -> dict:
         """Current vitals of the organism."""
         uptime = time.time() - self._start_time
-        return {
+        v: dict = {
             "alive": True,
+            "name": self.name,
             "breaths": self._breath_count,
             "heartbeats": self.heart.beat_count,
             "bpm": round(self.heart.bpm, 2),
             "rings": self.rings.summary(),
             "uptime_sec": round(uptime, 1),
             "breaths_per_min": round(self._breath_count / max(uptime / 60, 0.01), 2),
+            "x_density": round(self.x_density, 3),
+            "generation": self.generation,
         }
+        if self.lineage:
+            v["lineage"] = {
+                "parents": self.lineage.parents,
+                "merge_type": self.lineage.merge_type,
+                "generation": self.lineage.generation,
+            }
+        return v
 
     def to_dict(self) -> dict:
         """Serialize full organism state for persistence."""
-        data = {
-            "version": 2,
+        data: dict = {
+            "version": 3,
+            "name": self.name,
             "breath_count": self._breath_count,
             "start_time": self._start_time,
             "heart": {
@@ -356,6 +548,14 @@ class OrganismBreather:
             ],
             "ring_count_by_type": dict(self.rings._ring_count_by_type),
         }
+        # v1.4.0: include lineage
+        if self.lineage is not None:
+            data["lineage"] = {
+                "parents": self.lineage.parents,
+                "merge_type": self.lineage.merge_type,
+                "generation": self.lineage.generation,
+                "timestamp": self.lineage.timestamp,
+            }
         # v0.4.0: include graph state
         if self.graph is not None:
             data["graph"] = self.graph.to_dict()
@@ -364,7 +564,7 @@ class OrganismBreather:
     @classmethod
     def from_dict(cls, data: dict) -> "OrganismBreather":
         """Restore from serialized state. Bad data = fresh organism (never crash)."""
-        org = cls()
+        org = cls(name=str(data.get("name", "")))
         try:
             org._breath_count = int(data.get("breath_count", 0))
             org._start_time = float(data.get("start_time", time.time()))
@@ -386,6 +586,16 @@ class OrganismBreather:
 
             rbt = data.get("ring_count_by_type", {})
             org.rings._ring_count_by_type = {str(k): int(v) for k, v in rbt.items()}
+
+            # v1.4.0: restore lineage if present
+            ld = data.get("lineage")
+            if ld:
+                org.lineage = OrganismLineage(
+                    parents=list(ld.get("parents", [])),
+                    merge_type=str(ld.get("merge_type", "")),
+                    generation=int(ld.get("generation", 0)),
+                    timestamp=float(ld.get("timestamp", time.time())),
+                )
 
             # v0.4.0: restore graph if present
             graph_data = data.get("graph")

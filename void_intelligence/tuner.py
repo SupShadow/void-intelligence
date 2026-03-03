@@ -43,12 +43,22 @@ class ParameterSet:
         top_p:             0.0 = single token,    1.0 = full vocab
         max_tokens:        too low = truncation,   too high = hallucination
         context_intensity: 0.0 = no rings,         1.0 = full graph injection
+        reasoning_effort:  0.0 = no thinking,      1.0 = maximum depth
+
+    Temperature × Reasoning = the 2D Stribeck SURFACE:
+        Temperature = horizontal (width of exploration, chaos)
+        Reasoning   = vertical (depth of thinking, logos)
+        δ_opt is a VALLEY on this surface, not a point on a curve.
+
+    The Greeks knew: logos = word = reason = ratio.
+    LLM reasoning IS Gedankensprechen — the model × itself.
     """
 
     temperature: float = 0.7
     top_p: float = 0.9
     max_tokens: int = 2048
     context_intensity: float = 0.6
+    reasoning_effort: float = 0.5  # 0.0=none, 0.5=medium, 1.0=max depth
 
     # Stribeck metadata (NOT tuning targets)
     confidence: float = 0.0   # 0-1: how confident in these values
@@ -59,6 +69,22 @@ class ParameterSet:
         """Is confidence high enough to be at the Stribeck minimum?"""
         return self.confidence >= 0.5 and self.observations >= 5
 
+    @property
+    def reasoning_label(self) -> str:
+        """Map continuous reasoning_effort to provider effort labels.
+
+        0.0-0.15 = none, 0.15-0.4 = low, 0.4-0.7 = medium, 0.7+ = high
+        Matches Anthropic/OpenAI effort parameters.
+        """
+        if self.reasoning_effort < 0.15:
+            return "none"
+        elif self.reasoning_effort < 0.4:
+            return "low"
+        elif self.reasoning_effort < 0.7:
+            return "medium"
+        else:
+            return "high"
+
     def distance_from(self, other: "ParameterSet") -> float:
         """Euclidean distance in parameter space. Normalized."""
         diffs = [
@@ -66,8 +92,9 @@ class ParameterSet:
             (self.top_p - other.top_p),                          # range 0-1
             (self.max_tokens - other.max_tokens) / 8192,         # range ~128-8192
             (self.context_intensity - other.context_intensity),   # range 0-1
+            (self.reasoning_effort - other.reasoning_effort),     # range 0-1
         ]
-        return math.sqrt(sum(d * d for d in diffs) / 4)
+        return math.sqrt(sum(d * d for d in diffs) / 5)
 
     def to_dict(self) -> dict:
         return {
@@ -75,6 +102,7 @@ class ParameterSet:
             "top_p": self.top_p,
             "max_tokens": self.max_tokens,
             "context_intensity": self.context_intensity,
+            "reasoning_effort": self.reasoning_effort,
             "confidence": round(self.confidence, 3),
             "observations": self.observations,
         }
@@ -86,72 +114,122 @@ class ParameterSet:
             top_p=float(data.get("top_p", 0.9)),
             max_tokens=int(data.get("max_tokens", 2048)),
             context_intensity=float(data.get("context_intensity", 0.6)),
+            reasoning_effort=float(data.get("reasoning_effort", 0.5)),
             confidence=float(data.get("confidence", 0.0)),
             observations=int(data.get("observations", 0)),
         )
 
 
-# -- Hex defaults: initial guess from hex profile -----------------------
+# -- Hex Field: spherical parameter mapping ----------------------------
+#
+# NOT a flat hexagon with if-statements. A FIELD. A SPHERE.
+# Every point in 6D hex space maps continuously to 5D parameter space.
+# No thresholds. No projections. No lost dimensions.
+#
+# Each parameter has an ATTRACTOR DIRECTION in hex space:
+#   dot(hex_vector, attractor) × magnitude = field strength
+#
+# The × between axes is naturally captured — a prompt that is
+# BOTH urgent AND creative has a different dot product than either alone.
+# That's the collision. That's where δ_opt lives.
+#
+# Axes: [ruhe_druck, stille_resonanz, allein_zusammen,
+#         empfangen_schaffen, sein_tun, langsam_schnell]
+#
+# Sign convention:
+#   ruhe_druck:       + = pressure/urgent,  - = calm/spacious
+#   stille_resonanz:  + = resonance/dialog, - = silence/solo
+#   allein_zusammen:  + = together,         - = alone
+#   empfangen_schaffen: + = create,         - = receive
+#   sein_tun:         + = doing/action,     - = being/reflective
+#   langsam_schnell:  + = fast,             - = slow/thorough
+
+_FIELD = {
+    # temperature: creativity pulls UP, urgency+speed pull DOWN
+    "temperature": {
+        "base": 0.7,
+        "sensitivity": 0.30,
+        "direction": [-0.35, 0.10, 0.00, 0.45, -0.15, -0.25],
+    },
+    # top_p: creativity pulls UP, urgency pulls DOWN
+    "top_p": {
+        "base": 0.9,
+        "sensitivity": 0.10,
+        "direction": [-0.20, 0.05, 0.00, 0.40, -0.10, -0.15],
+    },
+    # max_tokens: slow/reflective/creative → MORE, fast/urgent → LESS
+    "max_tokens": {
+        "base": 2048,
+        "sensitivity": 2048,  # can shift ±2048 from base
+        "direction": [-0.20, 0.10, 0.05, 0.15, -0.30, -0.40],
+    },
+    # context_intensity: together/resonance → MORE, alone/silence → LESS
+    "context_intensity": {
+        "base": 0.6,
+        "sensitivity": 0.25,
+        "direction": [-0.05, 0.30, 0.35, 0.05, -0.10, 0.00],
+    },
+    # reasoning_effort: reflective/slow → DEEP, urgent/fast → SHALLOW
+    # Logos = Gedankensprechen = model × itself. The Greeks knew.
+    "reasoning_effort": {
+        "base": 0.5,
+        "sensitivity": 0.35,
+        "direction": [-0.40, 0.20, 0.15, 0.15, -0.40, -0.35],
+    },
+}
+
+
+def _field_strength(coord: HexCoord, field_def: dict) -> float:
+    """Compute field value at a hex coordinate.
+
+    Field equation: value = base + sensitivity × dot(direction, hex) × magnitude
+    The dot product captures × between ALL axes simultaneously.
+    Magnitude scales the effect — neutral prompts stay at base.
+    """
+    hex_vec = [
+        coord.ruhe_druck, coord.stille_resonanz, coord.allein_zusammen,
+        coord.empfangen_schaffen, coord.sein_tun, coord.langsam_schnell,
+    ]
+    direction = field_def["direction"]
+
+    # Dot product: the × between hex space and parameter attractor
+    dot = sum(d * h for d, h in zip(direction, hex_vec))
+
+    # Normalize by direction magnitude (so direction length doesn't bias)
+    dir_mag = math.sqrt(sum(d * d for d in direction))
+    if dir_mag > 0:
+        dot /= dir_mag
+
+    # Scale by coord magnitude — neutral prompts (center) → no shift
+    # Strong hex signals → full shift. This IS the sphere.
+    mag = coord.magnitude
+
+    return field_def["base"] + field_def["sensitivity"] * dot * min(mag * 2, 1.0)
+
 
 def _defaults_from_hex(coord: HexCoord) -> ParameterSet:
-    """Initial parameter guess from hex classification.
+    """Map hex coordinate to parameters via spherical field equation.
 
-    The hex profile tells us WHAT KIND of task this is.
-    Different tasks have different Stribeck minima:
-        - Urgent + fast = lower temp, fewer tokens (focused)
-        - Creative = higher temp (diverse exploration)
-        - Reflective = moderate temp, more tokens (depth)
-        - Collaborative = more context (organism state matters)
+    Not a flat hexagon. Not if-statements. A continuous FIELD.
+    Every point in 6D hex space maps smoothly to 5D parameter space.
+    The × between axes is preserved — urgency × creativity is its
+    OWN thing, not the average of urgency and creativity separately.
+
+    Like gravity: smooth, continuous, no edges, every point matters.
+    Like a sphere: reachable from any direction, no privileged axis.
     """
-    temp = 0.7
-    top_p = 0.9
-    max_tokens = 2048
-    ctx = 0.6
-
-    # Pressure axis: urgent tasks need focused, precise output
-    if coord.ruhe_druck > 0.3:
-        temp -= 0.15
-        max_tokens = min(max_tokens, 1536)
-    elif coord.ruhe_druck < -0.3:
-        # Calm: space for exploration
-        temp += 0.05
-
-    # Create axis: creative tasks benefit from higher temperature
-    if coord.empfangen_schaffen > 0.3:
-        temp += 0.15
-        top_p = min(top_p + 0.05, 1.0)
-    elif coord.empfangen_schaffen < -0.3:
-        # Receiving: absorbing, lower diversity
-        temp -= 0.05
-
-    # Speed axis: fast = concise, slow = thorough
-    if coord.langsam_schnell > 0.3:
-        max_tokens = min(max_tokens, 1024)
-    elif coord.langsam_schnell < -0.3:
-        max_tokens = max(max_tokens, 4096)
-        ctx = min(ctx + 0.15, 1.0)
-
-    # Together axis: collaborative tasks need more organism context
-    if coord.allein_zusammen > 0.3:
-        ctx = min(ctx + 0.15, 1.0)
-
-    # Being axis: reflective tasks need moderate temp + more depth
-    if coord.sein_tun < -0.3:
-        max_tokens = max(max_tokens, 3072)
-        temp = max(0.5, min(temp, 0.8))
-    elif coord.sein_tun > 0.3:
-        # Action: decisive, lower temp
-        temp -= 0.05
-
-    # Resonance axis: discussion = more context
-    if coord.stille_resonanz > 0.3:
-        ctx = min(ctx + 0.1, 1.0)
+    temp = _field_strength(coord, _FIELD["temperature"])
+    top_p = _field_strength(coord, _FIELD["top_p"])
+    tokens = _field_strength(coord, _FIELD["max_tokens"])
+    ctx = _field_strength(coord, _FIELD["context_intensity"])
+    reasoning = _field_strength(coord, _FIELD["reasoning_effort"])
 
     return ParameterSet(
-        temperature=round(max(0.0, min(2.0, temp)), 2),
-        top_p=round(max(0.0, min(1.0, top_p)), 2),
-        max_tokens=max(256, min(8192, max_tokens)),
-        context_intensity=round(max(0.0, min(1.0, ctx)), 2),
+        temperature=round(max(0.0, min(2.0, temp)), 3),
+        top_p=round(max(0.0, min(1.0, top_p)), 3),
+        max_tokens=max(256, min(8192, int(tokens))),
+        context_intensity=round(max(0.0, min(1.0, ctx)), 3),
+        reasoning_effort=round(max(0.0, min(1.0, reasoning)), 3),
     )
 
 
@@ -241,6 +319,7 @@ class StribeckTuner:
                 top_p=params.top_p,
                 max_tokens=params.max_tokens,
                 context_intensity=params.context_intensity,
+                reasoning_effort=params.reasoning_effort,
             )
 
         current = self._map[key]
@@ -257,6 +336,7 @@ class StribeckTuner:
             current.temperature += lr * (params.temperature - current.temperature)
             current.top_p += lr * (params.top_p - current.top_p)
             current.context_intensity += lr * (params.context_intensity - current.context_intensity)
+            current.reasoning_effort += lr * (params.reasoning_effort - current.reasoning_effort)
         else:
             # Sick. Decrease confidence, adjust based on specific failures
             current.confidence = max(0.0, current.confidence - lr * 2)
@@ -292,27 +372,34 @@ class StribeckTuner:
             incoherent    -> temperature too HIGH (turbulent friction)
         """
         if category == "repetition":
-            # Static friction: increase temperature to break out
+            # Static friction: increase temperature AND reasoning to break out
             params.temperature += lr * 3
             params.top_p = min(1.0, params.top_p + lr)
+            params.reasoning_effort = min(1.0, params.reasoning_effort + lr * 2)
         elif category == "too_short":
-            # Not enough output space
+            # Not enough output space — maybe needs deeper thinking too
             params.max_tokens = min(8192, int(params.max_tokens * 1.5))
+            params.reasoning_effort = min(1.0, params.reasoning_effort + lr)
         elif category == "too_long":
-            # Hallucination: reduce output space
+            # Hallucination: reduce output AND reasoning (overthinking)
             params.max_tokens = max(256, int(params.max_tokens * 0.7))
+            params.reasoning_effort = max(0.0, params.reasoning_effort - lr)
         elif category == "refusal":
             # Model overwhelmed by context -> reduce injection
             params.context_intensity = max(0.0, params.context_intensity - lr * 3)
-            # Also try slightly higher temp to break out of refusal mode
             params.temperature += lr
         elif category == "hex_divergent":
-            # Response drifted from prompt -> increase context anchoring
+            # Response drifted from prompt -> increase context AND reasoning
             params.context_intensity = min(1.0, params.context_intensity + lr * 2)
+            params.reasoning_effort = min(1.0, params.reasoning_effort + lr * 2)
         elif category == "incoherent":
-            # Turbulent friction: reduce temperature
+            # Turbulent friction: reduce temperature, INCREASE reasoning (think more, explore less)
             params.temperature -= lr * 3
             params.top_p = max(0.0, params.top_p - lr)
+            params.reasoning_effort = min(1.0, params.reasoning_effort + lr)
+        elif category == "shallow":
+            # Surface-level response: INCREASE reasoning (think deeper)
+            params.reasoning_effort = min(1.0, params.reasoning_effort + lr * 3)
 
     @staticmethod
     def _clamp(p: ParameterSet) -> None:
@@ -321,6 +408,7 @@ class StribeckTuner:
         p.top_p = round(max(0.0, min(1.0, p.top_p)), 3)
         p.max_tokens = max(128, min(8192, p.max_tokens))
         p.context_intensity = round(max(0.0, min(1.0, p.context_intensity)), 3)
+        p.reasoning_effort = round(max(0.0, min(1.0, p.reasoning_effort)), 3)
 
     # -- Region quantization ----------------------------------------------
 

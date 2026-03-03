@@ -174,6 +174,35 @@ def diagnose(
         if overlap < 0.08:
             flags.append(f"incoherent({overlap:.0%})")
 
+    # Layer 6: × Detection — is the response thinking in × or →?
+    # Detects shallow/linear responses when the prompt field called for depth.
+    # Only triggers when context_intensity was high (× thinking was expected).
+    #
+    # × markers: cross-domain language, collision awareness, lost_dimensions
+    # → markers: purely sequential, no connections, no uncertainty
+    scores["collision"] = 1.0
+    if rlen > 100:
+        # Count × indicators in response
+        _x_markers = [
+            "connect", "collision", "×", "between", "interact",
+            "cross", "dimension", "perspective", "however", "yet",
+            "on the other hand", "paradox", "tension", "both",
+            "simultaneously", "meanwhile", "verbindung", "kollision",
+            "zwischen", "gleichzeitig", "andererseits", "spannung",
+        ]
+        x_count = sum(1 for m in _x_markers if m in lower)
+
+        # High-context prompts (reflective, collaborative, creative) expect ×
+        prompt_expects_x = (
+            prompt_hex.magnitude > 0.25
+            and (prompt_hex.sein_tun < -0.1 or prompt_hex.empfangen_schaffen > 0.1
+                 or prompt_hex.stille_resonanz > 0.1)
+        )
+
+        if prompt_expects_x and x_count == 0 and rlen > 300:
+            flags.append("shallow(no_collision)")
+            scores["collision"] = 0.3
+
     return Diagnosis(
         healthy=len(flags) == 0,
         hex_delta=delta,

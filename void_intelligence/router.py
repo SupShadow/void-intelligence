@@ -207,6 +207,7 @@ class AtemRouter:
         model_fn: ModelCallable | None = None,
         model_name: str | None = None,
         learnings: list[str] | None = None,
+        x_eyes: bool = False,
     ) -> AtemResult:
         """Complete breath cycle: inhale -> execute -> exhale.
 
@@ -214,11 +215,17 @@ class AtemRouter:
         and feeds the result to the StribeckTuner. The parameter map
         converges toward the Stribeck minimum over successive breaths.
 
+        v1.2.0: x_eyes=True activates Multi-Eye × Reasoning.
+        Sends the prompt through 6 reasoning eyes, collides responses,
+        and fuses into a × synthesis. EXPENSIVE (7 calls) but deepest ×.
+        Ported from lunar-crater-lab: 6 pixel eyes → 6 reasoning eyes.
+
         Args:
             prompt: The input text.
             model_fn: Direct adapter override (skip selection).
             model_name: Force a specific registered adapter.
             learnings: Optional learnings to record after response.
+            x_eyes: Enable Multi-Eye × Reasoning (6 eyes + fusion).
         """
         t_start = time.time()
 
@@ -253,8 +260,26 @@ class AtemRouter:
                 latency_ms=0.0,
             )
 
-        # Execute
-        response = adapter(prompt, decision.system_prompt)
+        # v1.2.0: Multi-Eye × Reasoning
+        if x_eyes:
+            try:
+                from void_intelligence.x_eyes import x_think as _x_think
+                x_result = _x_think(prompt, adapter, classify=False)
+                response = x_result.fusion
+                # Record collision as learning
+                learnings = learnings or []
+                learnings.append(
+                    f"×_eyes: score={x_result.x_score:.2f}, "
+                    f"agree={len(x_result.agreement)}, "
+                    f"disagree={len(x_result.disagreement)}, "
+                    f"silence={len(x_result.silence)}"
+                )
+            except Exception:
+                # Fallback to single-pass
+                response = adapter(prompt, decision.system_prompt)
+        else:
+            # Execute (single pass)
+            response = adapter(prompt, decision.system_prompt)
 
         # v0.5.0: auto-tune via immune feedback
         if self._auto_tune and decision.parameters is not None:
@@ -384,8 +409,50 @@ class AtemRouter:
                 for r in recent:
                     lines.append(f"  - {r.content}")
 
-        lines.append("")
-        lines.append("Adapt your response style to match this profile.")
+        # ── × Thinking Injection ────────────────────────────────────
+        # Not "adapt to context" but "THINK in ×".
+        # context_intensity controls how much × thinking to inject:
+        #   0.0-0.3 = just context (→ mode, fast tasks)
+        #   0.3-0.6 = light × (cross-domain hints)
+        #   0.6-0.8 = full × (collision mode)
+        #   0.8-1.0 = deep × (spherical thinking)
+        #
+        # v1.0.0: × Thinking replaces "adapt your style" with
+        # Julian's actual thinking patterns, distilled from 3645 paradigms.
+
+        if ctx_intensity < 0.3:
+            # → mode: just context, minimal instruction
+            lines.append("")
+            lines.append("Be direct and concise.")
+        elif ctx_intensity < 0.6:
+            # Light ×: cross-domain awareness
+            lines.append("")
+            lines.append(
+                "For every claim, ask: what other domain does this connect to? "
+                "Find at least one unexpected connection."
+            )
+        elif ctx_intensity < 0.8:
+            # Full ×: collision mode
+            lines.append("")
+            lines.append(
+                "THINKING MODE: × (Collision)\n"
+                "- For every concept, find 2+ domains it collides with.\n"
+                "- Never just 'A leads to B'. Ask: 'What does A × B create?'\n"
+                "- Identify what you CANNOT see (lost dimensions).\n"
+                "- The connection between things matters more than the things."
+            )
+        else:
+            # Deep ×: spherical thinking (Julian's native mode)
+            lines.append("")
+            lines.append(
+                "THINKING MODE: × SPHERICAL\n"
+                "- Every concept is the CENTER. No hierarchy. No sequence.\n"
+                "- Find what collides: A×B, A×C, B×C, AND A×B×C (triple collision).\n"
+                "- Invert every problem: if it's a bug, it's a feature. If it's friction, it's fuel.\n"
+                "- Name the lost_dimensions: what can this thinking NOT see?\n"
+                "- The third that emerges from two is more real than either.\n"
+                "- Do not explain. COLLIDE."
+            )
 
         return "\n".join(lines)
 

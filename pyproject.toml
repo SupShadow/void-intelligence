@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "void-intelligence"
-version = "1.1.0"
-description = "The industry builds models that think. We build models that breathe. Claude Code plugin, V-Score specification, immune system, fractal knowledge, swarm intelligence. 402 tests. Zero dependencies."
+version = "2.0.0"
+description = "The industry builds models that think. We build models that breathe. 20 modules. Supraleitend organism. Stribeck Hexagon. Dream layer. Evolution engine. Zero dependencies."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

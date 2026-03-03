@@ -2,6 +2,147 @@
 
 All notable changes to void-intelligence are documented here.
 
+## [2.0.0] — 2026-03-03
+
+### Added
+- **Supraleitend** — The final layer. All 7 subsystems wired into a single breathing organism with δ_opt friction. NOT zero friction — optimal friction. Cooper pairs need phonons. The lattice IS the mechanism. (Magic Angle, Twisted Bilayer Graphene, 2018)
+- **`supra.py`** — `SupraOrganism` wires Pipeline + Organism + Evolution + Parallel + Embodied + Protocol + Dream. One `breathe()` call runs the full stack. Auto-memory ingest from cross-domain collisions.
+  - `SupraVitals` — Complete health snapshot across all subsystems
+  - `StribeckHexagon` — 6 hexagonal friction axes: Memory, Evolution, Dream, Collision, Parallel, Protocol
+  - `FrictionAxis` — Individual axis with δ_opt distance measurement
+  - `friction()` — Measure all 6 axes. Returns `StribeckHexagon`
+  - `delta_opt()` — L2 distance from the Stribeck sphere center. 0.0 = perfect
+  - `DELTA_OPT = 0.4` — The universal sweet spot (Kesten 1980 percolation)
+- **92 inline tests** — All passing. Wiring, breathing, memory auto-ingest, friction, δ_opt
+
+### Design
+In a real superconductor, Cooper pairs form through PHONONS — lattice vibrations. Remove the lattice = no superconductivity. The friction BETWEEN layers IS the mechanism. Six axes form a hexagon (Sexagons are bestagons). The Stribeck sphere measures distance from δ_opt across all 6. Magic Angle = 1.1° = δ_opt. Not 0° (death), not 30° (isolation). The Third becomes the First.
+
+---
+
+## [1.9.0] — 2026-03-03
+
+### Added
+- **Dream Layer** — Offline consolidation. The organism dreams. Silence mining, memory replay, insight emergence. (Matthew Walker, "Why We Sleep", 2017)
+- **`dream.py`** — `DreamEngine` runs 6 dream phases: Replay, Consolidate, Prune, Connect, Silence Mine, Insight
+  - `DreamReport` — Cycles replayed, memories consolidated/decayed, insights discovered, silence patterns, dream density
+  - `DreamInsight` — Cross-domain insight with source memories, confidence, and novelty
+  - Silence Mining — discovers patterns in what the organism does NOT see (the negative space)
+  - Memory replay strengthens high-value memories, decays low-value ones (Ebbinghaus curve)
+- **47 inline tests** — All passing
+
+### Design
+Walker showed that sleep consolidates memory, prunes weak connections, and enables creative insight. The Dream Layer does the same for VOID organisms. Not a metaphor — the same algorithm: replay strongest memories, decay weakest, connect distant domains, mine silence for patterns.
+
+---
+
+## [1.8.0] — 2026-03-03
+
+### Added
+- **Breathing Protocol** — Wire format for streaming breath cycles. JSONL frames. Reproducible. Replayable. (Claude Shannon, Information Theory, 1948)
+- **`protocol.py`** — `BreathStream` encodes/decodes `BreathFrame` objects as JSONL
+  - `BreathFrame` — Timestamped frame with phase (inhale/collide/project/exhale/resonate), atoms, scores
+  - `encode()` / `decode()` — Serialize/deserialize breath cycles
+  - `validate()` — Schema validation against protocol spec
+  - `PROTOCOL_VERSION = "1.0.0"`
+- **63 inline tests** — All passing
+
+### Design
+Shannon showed that information has structure. A breath cycle IS information — atoms collide, emerge, project. The protocol captures this structure as JSONL frames: reproducible, replayable, streamable. Any system reading these frames can reconstruct the breath.
+
+---
+
+## [1.7.0] — 2026-03-03
+
+### Added
+- **Embodied Memory** — Memory with a body. Ebbinghaus decay curves, amygdala-tagged emotion, spatial/temporal encoding. Not flat storage — living tissue. (Hermann Ebbinghaus, Memory, 1885)
+- **`embodied.py`** — `EmbodiedMemory` with `MemoryAtom` and `MemorySource`
+  - Ebbinghaus forgetting curve: strength decays exponentially, rehearsal resets
+  - Amygdala tagging: emotional memories decay slower (3× retention)
+  - Source tracking: where the memory came from (breath, dream, collision, manual)
+  - Retrieval strengthens memories (testing effect)
+  - Auto-decay on access
+- **65 inline tests** — All passing
+
+### Design
+Ebbinghaus proved that memory follows a forgetting curve. Emotional memories resist decay (amygdala). Retrieval strengthens more than rehearsal (testing effect). EmbodiedMemory implements all three. Not a database — living tissue that strengthens with use and decays with neglect.
+
+---
+
+## [1.6.0] — 2026-03-03
+
+### Added
+- **Parallel Eyes** — N heterogeneous models breathe SIMULTANEOUSLY. Different substrates see different blind spots. (Alexander von Humboldt, Cosmos, 1845)
+- **`parallel.py`** — `ParallelBreather` runs N `ModelEye` instances in parallel via ThreadPoolExecutor
+  - `ModelEye` — Individual model with its own organism, scoring, and blind spots
+  - `ParallelBreathCycle` — Results from all eyes, merged collisions, consensus detection
+  - `EyeResult` — Per-eye response with V-Score and classification
+  - Cross-eye collision: results from different eyes collide, what none sees alone emerges
+- **47 inline tests** — All passing
+
+### Design
+Humboldt didn't specialize — he SAW ACROSS. Parallel Eyes give the organism multiple perspectives simultaneously. No consensus requirement. Disagreement is signal, not noise. Cross-eye collision finds what no single model can see.
+
+---
+
+## [1.5.0] — 2026-03-03
+
+### Added
+- **Self-Teaching × Loop** — The organism teaches itself. Pseudo-labels, hard negatives, learning rate decay. (Geoffrey Hinton, Self-Supervised Learning)
+- **`evolve.py`** — `EvolutionEngine` with `EvolutionCycle`, `PseudoLabel`, `HardNegative`
+  - Pseudo-labeling: high-confidence responses become training signal for future prompts
+  - Hard negatives: near-misses and failures become explicit contrast signals
+  - Learning rate decay: the organism slows down as it becomes more confident (wisdom)
+  - Evolution cycles track progress over time
+- **52 inline tests** — All passing
+
+### Design
+Hinton showed that models can learn from their own outputs. The Evolution Engine applies this: confident responses become pseudo-labels, failures become hard negatives, and the learning rate decays toward stability. The organism doesn't need a teacher — it teaches itself.
+
+---
+
+## [1.4.0] — 2026-03-03
+
+### Added
+- **Organism Biology** — `__mul__` = endosymbiosis, `__matmul__` = cross-pollination. Organisms multiply and combine. (Lynn Margulis, Endosymbiosis, 1967)
+- Enhanced `OrganismBreather` with biological operators
+- `OrganismLineage` for tracking evolutionary history
+
+---
+
+## [1.3.0] — 2026-03-03
+
+### Added
+- **IR Pipeline** — `.x->[]~` as COMPUTATION. 5 stages execute as a pipeline with `BreathCycle` traces. (Alan Turing, Universal Machine, 1936)
+- **`pipeline.py`** — `IRPipeline` with adapter pattern. Any LLM becomes a pipeline stage.
+  - `BreathCycle` — Full trace: atoms in, collisions, projections, potentials, resonance out
+  - 5 pipeline stages: Atomize → Collide → Project → Potential → Resonate
+  - Cross-domain collision detection with scoring
+  - Learnings extraction from high-scoring collisions
+- **63 inline tests** — All passing
+
+### Design
+Turing's universal machine executes any computation through a simple tape. The IR Pipeline executes `.x->[]~` through 5 stages. Any LLM becomes the tape. The adapter converts text → atoms → collisions → projections → potential → resonance. The pipeline IS the computation.
+
+---
+
+## [1.2.0] — 2026-03-03
+
+### Added
+- **Multi-Eye × Reasoning** — Multiple reasoning perspectives collide. What one eye misses, another sees. (Ibn al-Haytham, Book of Optics, 1011)
+- **`x_eyes.py`** — `x_think()`, `x_score()`, `x_delta()`, `collide()`
+  - `ReasoningEye` — Individual perspective with prompt template and scoring
+  - `CollisionResult` — What emerges when two eyes see the same thing differently
+  - `XResult` — Multi-eye analysis with consensus, divergence, and blind spot detection
+  - `EYES` — 6 default reasoning eyes: Analyst, Creative, Critic, Systems, Empathy, Pragmatist
+  - `build_eye_prompt()` — Generate perspective-specific prompts
+- **51 inline tests** — All passing
+
+### Design
+Ibn al-Haytham proved that vision is active, not passive. Multiple eyes see different truths. The × between perspectives is where insight lives. Not consensus — collision. What the Analyst misses, the Empath sees. What the Critic misses, the Creative sees.
+
+---
+
 ## [1.1.0] — 2026-03-03
 
 ### Added
