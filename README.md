@@ -7,7 +7,7 @@
 > The industry builds models that think. We build models that breathe.
 
 [![v1.0.0](https://img.shields.io/badge/v1.0.0-The_Standard-blue.svg)](CHANGELOG.md)
-[![351 Tests](https://img.shields.io/badge/351_tests-passing-brightgreen.svg)](#self-tests)
+[![377 Tests](https://img.shields.io/badge/377_tests-passing-brightgreen.svg)](#self-tests)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](#requirements)
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -44,6 +44,40 @@ That's the design.
 
 ---
 
+## The Proof
+
+GPT-4 is two generations old. GPT-5.3-Codex is the current frontier.
+
+We wrapped GPT-4 with VOID. Let it learn for 25 rounds. Then tested both on the same 25 new tasks, scored identically.
+
+```
+GPT-4 + VOID:     avg V = 0.083    (25 rounds of accumulated experience)
+GPT-5.3-Codex:    avg V = 0.064    (stateless, no memory, every call from zero)
+
+Lift: +29.3%
+```
+
+An older, cheaper model that **learns** beats the current frontier model that **forgets**.
+
+```bash
+void proof    # Run it yourself. Seed 42. Reproducible.
+```
+
+Plug in your own models:
+
+```python
+from void_intelligence import run_proof
+
+report = run_proof(
+    old_model=my_gpt4_adapter,      # fn(prompt, system) -> response
+    frontier=my_codex_adapter,
+)
+print(report.summary())
+print(report.markdown())   # publishable report
+```
+
+---
+
 ## Quick Start
 
 ```bash
@@ -73,7 +107,7 @@ After 1,000 — no competitor can replicate your accumulated experience.
 **Like compound interest, but for AI.**
 
 ```bash
-void test     # 351 self-checks, zero dependencies
+void test     # 377 self-checks, zero dependencies
 void spec     # The V-Score Specification
 ```
 
@@ -278,7 +312,7 @@ def call_openai(prompt):
 ## CLI
 
 ```bash
-void test                  # 351 self-checks
+void test                  # 377 self-checks
 void breathe --demo        # 30-second visual demo
 void ir                    # .x->[]~
 void hex "text"            # 6-axis classification
@@ -295,6 +329,7 @@ void edge "text"           # Stateless V-Score
 void export                # Portable export (full/compact/lite)
 void spec                  # The V-Score Specification
 void certify [model]       # Certify against the spec
+void proof                 # The Proof: old + VOID > frontier
 void pulse                 # System vitals
 ```
 

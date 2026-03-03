@@ -141,6 +141,13 @@ from void_intelligence.spec import (
     spec_markdown,
 )
 
+from void_intelligence.proof import (
+    run_proof,
+    ProofReport,
+    Task,
+    get_tasks,
+)
+
 __version__ = "1.0.0"
 
 __all__ = [
@@ -183,4 +190,6 @@ __all__ = [
     "VScoreComponents", "ModelCard", "ComplianceResult", "CertificationLevel",
     "SPEC_VERSION", "CERTIFICATION_LEVELS", "STATUS_THRESHOLDS", "WIRE_FORMAT", "HEX_AXES",
     "v_score_status", "certify", "check_compliance", "spec_document", "spec_markdown",
+    # Proof (v1.1.0)
+    "run_proof", "ProofReport", "Task", "get_tasks",
 ]

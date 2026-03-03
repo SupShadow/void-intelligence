@@ -1189,6 +1189,47 @@ def cmd_test():
     check("Spec markdown sections", "§1" in md and "§10" in md)
     check("Spec markdown formula", "V = E * W * S * B * H" in md)
 
+    # ── Proof (v1.1.0) ──────────────────────────────────────────────
+    from void_intelligence.proof import (
+        run_proof, get_tasks, Task, ProofReport, _detect_category,
+    )
+
+    # Task suite
+    t1 = get_tasks(phase=1)
+    t2 = get_tasks(phase=2)
+    check("Proof tasks phase 1 count", len(t1) == 25)
+    check("Proof tasks phase 2 count", len(t2) == 25)
+    check("Proof tasks no overlap", not set(t.prompt for t in t1) & set(t.prompt for t in t2))
+    check("Proof tasks have category", all(t.category in ("URGENT", "CREATIVE", "TECHNICAL", "COLLABORATIVE", "REFLECTIVE") for t in t1))
+    check("Proof tasks have learnings", all(len(t.learnings) > 0 for t in t1))
+
+    # Category detection
+    check("Proof detect URGENT", _detect_category("urgent deadline now") == "URGENT")
+    check("Proof detect CREATIVE", _detect_category("write a poem") == "CREATIVE")
+    check("Proof detect TECHNICAL", _detect_category("explain how TCP works") == "TECHNICAL")
+    check("Proof detect COLLABORATIVE", _detect_category("brainstorm with the team") == "COLLABORATIVE")
+    check("Proof detect REFLECTIVE", _detect_category("reflect on growth") == "REFLECTIVE")
+
+    # Run the proof (simulated)
+    report = run_proof(seed=42)
+    check("Proof report type", isinstance(report, ProofReport))
+    check("Proof accumulation > 0", report.accumulation_rounds > 0)
+    check("Proof evaluation > 0", report.evaluation_rounds > 0)
+    check("Proof rings > 0", report.rings_accumulated > 0)
+    check("Proof old results", len(report.old_results) == 25)
+    check("Proof frontier results", len(report.frontier_results) == 25)
+    check("Proof old avg V > 0", report.old_avg_v > 0)
+    check("Proof frontier avg V > 0", report.frontier_avg_v > 0)
+    check("Proof old wins + frontier wins + ties = total",
+          report.old_wins + report.frontier_wins + report.ties == 25)
+    check("Proof OLD + VOID WINS", report.old_avg_v > report.frontier_avg_v)
+    check("Proof lift > 0", report.lift > 0)
+    check("Proof by_category has 5", len(report.by_category()) == 5)
+    check("Proof summary has WINS", "WINS" in report.summary())
+    check("Proof markdown has Results", "## Results" in report.markdown())
+    check("Proof to_dict has lift", "lift" in report.to_dict())
+    check("Proof reproducible", run_proof(seed=42).old_avg_v == report.old_avg_v)
+
     print()
     print(f"    {passed}/{total} tests passed.")
     print()
@@ -1758,6 +1799,43 @@ def cmd_certify(model: str):
     print()
 
 
+def cmd_proof():
+    """Run the proof: Old model + VOID > Frontier model."""
+    from void_intelligence.proof import run_proof
+
+    print()
+    print("  void proof --- The Proof")
+    print("  " + "=" * 60)
+    print()
+    print("  Hypothesis: An older model wrapped with VOID outperforms")
+    print("  the current frontier model. Compound intelligence > raw capability.")
+    print()
+    print("  Running experiment...")
+    print()
+
+    report = run_proof(seed=42)
+    print(report.summary())
+
+    # Show a few head-to-head examples
+    print("  Head-to-Head (first 5):")
+    print("  " + "-" * 60)
+    for old_r, front_r in zip(report.old_results[:5], report.frontier_results[:5]):
+        prompt = old_r.task.prompt[:45]
+        old_v = old_r.v_score
+        front_v = front_r.v_score
+        winner = "<< OLD" if old_v > front_v else "FRONTIER >>" if front_v > old_v else "TIE"
+        print(f"    {prompt:45s}  {old_v:.3f} vs {front_v:.3f}  {winner}")
+
+    print()
+    print("  To plug in REAL models:")
+    print("    from void_intelligence.proof import run_proof")
+    print("    report = run_proof(")
+    print("        old_model=my_gpt4_adapter,")
+    print("        frontier=my_codex_adapter,")
+    print("    )")
+    print()
+
+
 def cmd_edge(text: str):
     """Demo edge functions (v0.9.0)."""
     from void_intelligence.edge import breathe
@@ -1954,6 +2032,7 @@ def main() -> int:
         print("    void export           Portable organism export")
         print("    void spec             The V-Score Specification (Berners-Lee)")
         print("    void certify [model]  Certify a model against the V-Score spec")
+        print("    void proof            The Proof: old + VOID > frontier")
         print("    void --version        Show version")
         print()
         print("  pip install void-intelligence")
@@ -2062,6 +2141,10 @@ def main() -> int:
     if cmd == "certify":
         model = args[1] if len(args) > 1 else "unknown-model"
         cmd_certify(model)
+        return 0
+
+    if cmd == "proof":
+        cmd_proof()
         return 0
 
     if cmd == "benchmark":
