@@ -25,6 +25,8 @@ from typing import Callable
 
 from void_intelligence.organism import HexBreath, HexCoord, OrganismBreather
 from void_intelligence.profiles import VScoreProfile, BUNDLED_PROFILES
+from void_intelligence.tuner import StribeckTuner, ParameterSet
+from void_intelligence.pollinator import CrossPollinator, PollinationEvent
 
 # (prompt, system_prompt) -> response
 ModelCallable = Callable[[str, str], str]
@@ -41,6 +43,7 @@ class AtemDecision:
     system_prompt: str
     alternatives: list[str]
     reason: str
+    parameters: ParameterSet | None = None  # v0.5.0: Stribeck-tuned params
 
 
 @dataclass
@@ -73,6 +76,8 @@ class AtemRouter:
         profiles: dict[str, VScoreProfile] | None = None,
         prefer_local: bool = True,
         max_cost_per_m: float = 100.0,
+        tuner: StribeckTuner | None = None,
+        auto_tune: bool = True,
     ) -> None:
         self._hex = HexBreath()
         self._profiles = profiles if profiles is not None else dict(BUNDLED_PROFILES)
@@ -81,6 +86,10 @@ class AtemRouter:
         self._adapters: dict[str, ModelCallable] = {}
         self._prefer_local = prefer_local
         self._max_cost = max_cost_per_m
+        self._tuner = tuner or StribeckTuner()  # v0.5.0: parameter auto-tuning
+        self._auto_tune = auto_tune              # auto-tune in breathe()
+        self._pollinator = CrossPollinator()     # v0.6.0: cross-pollination
+        self._breath_since_pollinate = 0         # counter for auto-pollination
 
     # ── Registration ──────────────────────────────────────────────
 
@@ -149,10 +158,13 @@ class AtemRouter:
         profile = self._profiles[selected_name]
         organism = self._get_organism(selected_name)
 
+        # v0.5.0: get Stribeck-tuned parameters
+        params = self._tuner.tune(coord, model=selected_name)
+
         # Inhale on the organism
         organism.inhale(prompt)
 
-        system_prompt = self._build_system_prompt(coord, organism, profile)
+        system_prompt = self._build_system_prompt(prompt, coord, organism, profile, params)
         alternatives = [name for name, _ in ranked[1:6]]
 
         reason = self._explain(selected_name, profile, coord, score)
@@ -165,6 +177,7 @@ class AtemRouter:
             system_prompt=system_prompt,
             alternatives=alternatives,
             reason=reason,
+            parameters=params,
         )
 
     def exhale(
@@ -197,6 +210,10 @@ class AtemRouter:
     ) -> AtemResult:
         """Complete breath cycle: inhale -> execute -> exhale.
 
+        v0.5.0: If auto_tune=True, runs immune diagnosis on the response
+        and feeds the result to the StribeckTuner. The parameter map
+        converges toward the Stribeck minimum over successive breaths.
+
         Args:
             prompt: The input text.
             model_fn: Direct adapter override (skip selection).
@@ -222,6 +239,7 @@ class AtemRouter:
                     system_prompt=decision.system_prompt,
                     alternatives=decision.alternatives,
                     reason=f"Forced: {model_name}",
+                    parameters=decision.parameters,
                 )
         elif decision.selected_model in self._adapters:
             adapter = self._adapters[decision.selected_model]
@@ -238,8 +256,34 @@ class AtemRouter:
         # Execute
         response = adapter(prompt, decision.system_prompt)
 
+        # v0.5.0: auto-tune via immune feedback
+        if self._auto_tune and decision.parameters is not None:
+            try:
+                from void_intelligence.immune import diagnose as _diag
+                diag = _diag(prompt, response)
+                self._tuner.record(
+                    decision.hex, decision.parameters, diag,
+                    model=decision.selected_model,
+                )
+            except Exception:
+                pass  # Never crash on tuning failure
+
         result = self.exhale(decision, response, learnings)
         result.latency_ms = (time.time() - t_start) * 1000
+
+        # v0.6.0: auto-pollinate every N breaths
+        self._breath_since_pollinate += 1
+        if self._breath_since_pollinate >= 10:
+            self._breath_since_pollinate = 0
+            try:
+                graphs = {
+                    name: org.graph
+                    for name, org in self._organisms.items()
+                }
+                self._pollinator.auto_pollinate(graphs)  # type: ignore[arg-type]
+            except Exception:
+                pass  # Never crash on pollination failure
+
         return result
 
     # ── Scoring ───────────────────────────────────────────────────
@@ -291,13 +335,25 @@ class AtemRouter:
 
     def _build_system_prompt(
         self,
+        prompt: str,
         coord: HexCoord,
         organism: OrganismBreather,
         profile: VScoreProfile,
+        params: ParameterSet | None = None,
     ) -> str:
-        """Build organism injection. THE mechanism that makes R > 0."""
+        """Build organism injection. THE mechanism that makes R > 0.
+
+        v0.4.0: Uses graph-based context injection when available.
+        v0.5.0: context_intensity from StribeckTuner scales ring injection.
+        Falls back to flat ring list for pre-0.4.0 organisms.
+        """
         vitals = organism.vitals()
         rings_data = vitals.get("rings", {})
+
+        # v0.5.0: context_intensity controls how much organism context to inject
+        ctx_intensity = params.context_intensity if params else 0.6
+        # Scale max_rings by context_intensity (0.0 = 0 rings, 1.0 = 10 rings)
+        max_rings = max(1, int(ctx_intensity * 10 + 0.5))
 
         lines = [
             "Input classified on 6 axes:",
@@ -313,18 +369,23 @@ class AtemRouter:
             f"BPM {vitals['bpm']}",
         ]
 
-        # Include recent learnings (last 5 rings)
-        recent = organism.rings.rings[-5:] if organism.rings.rings else []
-        if recent:
+        # v0.4.0+: graph-based context injection (relevant rings, not just recent)
+        if organism.graph is not None and organism.graph.count > 0:
+            graph_ctx = organism.graph.to_context(prompt, max_rings=max_rings)
             lines.append("")
-            lines.append("Recent learnings:")
-            for r in recent:
-                lines.append(f"  - {r.content}")
+            lines.append(graph_ctx)
+        else:
+            # Fallback: flat ring list (pre-0.4.0 compat)
+            ring_count = max(1, int(ctx_intensity * 8 + 0.5))
+            recent = organism.rings.rings[-ring_count:] if organism.rings.rings else []
+            if recent:
+                lines.append("")
+                lines.append("Recent learnings:")
+                for r in recent:
+                    lines.append(f"  - {r.content}")
 
         lines.append("")
         lines.append("Adapt your response style to match this profile.")
-        if recent:
-            lines.append("Build on previous learnings where relevant.")
 
         return "\n".join(lines)
 
@@ -363,9 +424,80 @@ class AtemRouter:
             reason += f" | {', '.join(strengths)}"
         if ring_count > 0:
             reason += f" | tau moat: {ring_count} rings"
+
+        # v0.5.0: Stribeck distance
+        d_opt = self._tuner.delta_opt_distance(coord, model=name)
+        if d_opt < 1.0:
+            reason += f" | δ_opt={d_opt:.2f}"
+
         reason += f" | score={score:.3f}"
 
         return reason
+
+    # ── Pollinator Access (v0.6.0) ────────────────────────────────
+
+    @property
+    def pollinator(self) -> CrossPollinator:
+        """Access the cross-pollinator for manual control."""
+        return self._pollinator
+
+    def pollinate(self, source_model: str, target_model: str, **kwargs) -> PollinationEvent | None:
+        """Manually pollinate between two models."""
+        source_org = self._organisms.get(source_model)
+        target_org = self._organisms.get(target_model)
+        if not source_org or not target_org:
+            return None
+        if source_org.graph is None or target_org.graph is None:
+            return None
+        event = self._pollinator.pollinate(
+            source_graph=source_org.graph,
+            source_model=source_model,
+            target_graph=target_org.graph,
+            target_model=target_model,
+            **kwargs,
+        )
+        if event.rings_transferred > 0:
+            self._save_organism(target_model)
+        return event
+
+    def save_pollinator(self) -> None:
+        """Persist the cross-pollination state to disk."""
+        path = self._state_dir / "pollinator" / "state.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self._pollinator.to_dict(), indent=2))
+
+    def load_pollinator(self) -> None:
+        """Restore cross-pollination state from disk."""
+        path = self._state_dir / "pollinator" / "state.json"
+        if path.exists():
+            try:
+                data = json.loads(path.read_text())
+                self._pollinator = CrossPollinator.from_dict(data)
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+    # ── Tuner Access ───────────────────────────────────────────────
+
+    @property
+    def tuner(self) -> StribeckTuner:
+        """Access the Stribeck tuner for manual control."""
+        return self._tuner
+
+    def save_tuner(self) -> None:
+        """Persist the Stribeck surface to disk."""
+        tuner_path = self._state_dir / "tuner" / "stribeck.json"
+        tuner_path.parent.mkdir(parents=True, exist_ok=True)
+        tuner_path.write_text(json.dumps(self._tuner.to_dict(), indent=2))
+
+    def load_tuner(self) -> None:
+        """Restore the Stribeck surface from disk."""
+        tuner_path = self._state_dir / "tuner" / "stribeck.json"
+        if tuner_path.exists():
+            try:
+                data = json.loads(tuner_path.read_text())
+                self._tuner = StribeckTuner.from_dict(data)
+            except (json.JSONDecodeError, KeyError):
+                pass
 
     # ── Introspection ─────────────────────────────────────────────
 

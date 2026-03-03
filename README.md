@@ -2,16 +2,20 @@
 
 > The industry builds models that think. We build models that breathe.
 
+[![v1.0.0](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](#requirements)
+[![351 Tests](https://img.shields.io/badge/tests-351%20passed-brightgreen.svg)](#self-tests)
 [![35 Models Benchmarked](https://img.shields.io/badge/models_benchmarked-35-orange.svg)](#v-score-benchmark)
 
 ```bash
 pip install void-intelligence
-void test        # 30 self-checks
-void profiles    # See all 34 benchmarked models
+void test     # 351 self-checks, zero dependencies
+void spec     # The V-Score Specification
 ```
+
+---
 
 ## The Problem
 
@@ -22,27 +26,34 @@ Not broken — *dead*. They score well on benchmarks, then forget everything bet
 V-Score measures what benchmarks miss: **does your AI actually learn from use?**
 
 ```
-V = E × W × S × B × H × R
+V = E × W × S × B × H
 
-One zero kills everything. R (Ring Yield) is the differentiator.
-Claude Sonnet 4.6: R=0.00 → V=0.000 ($3.00/M, dead)
-Qwen3-14B:         R=0.99 → V=0.019 ($0.00/M, alive)
+One zero kills everything. Multiplicative by design.
+A model that refuses (W=0) scores V=0 regardless of intelligence.
 ```
-
-A $0 local model that learns beats a $3/M API model that forgets.
 
 ## What VOID Adds to Any LLM
 
-### 1. Experience Memory — Your AI Remembers
+VOID is an **organism layer**. Wrap any LLM — local or API — and it gains:
 
-Every interaction leaves a **growth ring** — a typed record of what worked, what failed, what was learned. Unlike flat logs, rings are queryable and persistent. Swap the model — the memory stays.
+- **Growth Rings** — persistent memory of what worked, what failed, what was learned
+- **6-Axis Classification** — keyword-based, <0.02ms, no LLM needed
+- **Adaptive Routing** — picks the model that *learns best*, not scores highest
+- **Immune System** — 5-layer response quality gate (Swiss Cheese Model)
+- **Fractal Knowledge** — rings form a graph, not a flat list (Mandelbrot)
+- **Auto-Tuning** — parameters converge to the Stribeck sweet spot per prompt type
+- **Cross-Pollination** — knowledge transfers between models (Margulis)
+- **V-Score API** — benchmark any model in real-time
+- **Swarm Intelligence** — distributed mesh of organisms (Gordon)
+- **Edge Functions** — stateless pure functions for serverless
+- **The Standard** — formal specification with compliance checker
 
 ```python
 from void_intelligence import OrganismBreather
 
 organism = OrganismBreather()
 
-# Before your LLM call: classify the input
+# Before your LLM call
 breath = organism.inhale("Help me write an urgent email to my team")
 # breath["hex"] → 6-axis classification (pressure, collaboration, speed...)
 
@@ -56,77 +67,28 @@ organism.vitals()
 # → {"alive": True, "breaths": 1, "rings": {"total": 1}, "bpm": 0.5}
 ```
 
-After 100 interactions, your system knows patterns a fresh install doesn't. After 1,000 — no competitor can replicate your accumulated experience. **Like compound interest, but for AI.**
+After 100 interactions, your system knows patterns a fresh install doesn't. After 1,000 — no competitor can replicate your accumulated experience. **Compound interest, but for AI.**
 
-### 2. V-Router — Adaptive Model Selection
+## The Journey — 8 Geniuses, 10 Versions
 
-Route every request to the model that learns best — not the one with the highest benchmark score.
+Each version collides with one genius. Each collision unlocks the next capability.
 
-```python
-from void_intelligence import AtemRouter
-
-router = AtemRouter()
-router.register_adapter("qwen3-14b", my_ollama_adapter)
-router.register_adapter("claude-3-haiku", my_api_adapter)
-
-# One call. VOID picks the best model, injects experience, records learnings.
-result = router.breathe("Analyze this forecast for anomalies")
-
-print(result.decision.selected_model)  # → "qwen3-14b"
-print(result.decision.reason)          # → "R=0.99 (learns from context), LOCAL/FREE"
-print(result.vitals_after["rings"])    # → {"total": 1}  (ring count grows over time)
-```
-
-The router scores models on a composite of hex affinity, learning ability, cost, and accumulated trust (ring count). Models that prove themselves over time get preferred — **earned trust, not assumed capability**.
-
-### 3. 6-Axis Intent Classification — No LLM Needed
-
-Keyword-based, deterministic, <0.02ms. Classifies any text on 6 axes before your LLM sees it:
-
-```
-Calm     ◂━━━━━━━━━━━▸ Pressure       "Is this urgent?"
-Silence  ◂━━━━━━━━━━━▸ Resonance      "Solo thought or discussion?"
-Alone    ◂━━━━━━━━━━━▸ Together       "Individual or team context?"
-Receive  ◂━━━━━━━━━━━▸ Create         "Consuming or producing?"
-Being    ◂━━━━━━━━━━━▸ Doing          "Reflecting or acting?"
-Slow     ◂━━━━━━━━━━━▸ Fast           "Deliberate or rapid?"
-```
-
-```python
-from void_intelligence import HexBreath
-
-hex = HexBreath()
-coord = hex.classify("Build something fast with the team")
-# coord.allein_zusammen  → +1.0 (together)
-# coord.langsam_schnell  → +1.0 (fast)
-# coord.balance          → 0.29 (pulled hard toward action)
-
-# Use this to route to different system prompts, models, or temperatures.
-# 95-98% agreement with GPT-4/Claude classification — at 25,000x the speed.
-```
-
-### 4. Self-Awareness Decorators
-
-```python
-from void_intelligence import lost_dimensions, circuit_breaker
-
-@lost_dimensions("emotional_nuance", "body_language", "sarcasm")
-def summarize_meeting(transcript: str) -> str:
-    return call_llm(transcript)
-
-# The function declares its blind spots. Queryable at runtime.
-summarize_meeting._lost_dimensions  # → ["emotional_nuance", "body_language", "sarcasm"]
-
-@circuit_breaker("openai_api", threshold=3, timeout=30.0)
-def call_openai(prompt: str) -> str:
-    return openai.chat.completions.create(...)
-
-# 3 failures → circuit opens → waits 30s → tries once → heals or stays open.
-```
+| Version | Genius | What it unlocks | Tests |
+|---------|--------|----------------|------:|
+| v0.1.0 | — | `.x->[]~` IR + Organism + HexBreath | 15 |
+| v0.2.0 | — | V-Router + 34 Profiles + Persistence | 30 |
+| v0.3.0 | James Reason | Immune System — 5-layer quality gate | 47 |
+| v0.4.0 | Mandelbrot | Ring Graph — fractal knowledge structure | 76 |
+| v0.5.0 | Stribeck | δ_opt Inference — auto-tune per prompt type | 101 |
+| v0.6.0 | Margulis | Cross-Pollination — ring transfer between models | 134 |
+| v0.7.0 | Page & Brin | V-Score API — benchmark-as-a-service | 172 |
+| v0.8.0 | Deborah Gordon | Swarm Network — distributed organism mesh | 246 |
+| v0.9.0 | Wozniak | VOID Everywhere — edge, serverless, IoT | 302 |
+| **v1.0.0** | **Berners-Lee** | **The Standard — V-Score specification** | **351** |
 
 ## V-Score Benchmark
 
-**March 2026. 35 models. 3 access paths. 9 families. The largest V-Score benchmark ever run.**
+**March 2026. 35 models. 3 access paths. 9 families.**
 
 ### Alive Models (V > 0)
 
@@ -142,7 +104,7 @@ def call_openai(prompt: str) -> str:
 | qwen2.5-7b | .84 | .12 | 1.0 | .76 | .37 | **.27** | **0.0076** | FREE | yes |
 | gpt-5.3-codex | .84 | .28 | .34 | .73 | .11 | **.40** | **0.0075** | $2.00 | |
 
-### Dead Models (V = 0, R = 0) — Selected
+### Dead Models (V = 0, R = 0)
 
 | Model | E | W | S | B | H | R | V-Score | Cost/M |
 |-------|--:|--:|--:|--:|--:|--:|--------:|-------:|
@@ -156,85 +118,149 @@ def call_openai(prompt: str) -> str:
 
 Full data: `void profiles` or 34 profiles in `void_intelligence/profiles.py`
 
-## How It Works
-
-**Experience Memory** — Each `exhale()` stores a typed growth ring (learning, error, milestone). Rings survive restarts via JSON persistence. Ring count biases routing toward trusted models — earned reputation, not assumed capability.
-
-**State-Model Separation** — The organism state (personality, learnings, ring history) is a portable JSON file. Swap GPT-4 for Llama — the accumulated experience persists. Your LLM is the body. VOID is the memory.
-
-**Compound Intelligence** — Ring count grows with every interaction. After 6 months, your system has institutional knowledge that no fresh deployment can replicate. The moat grows with time — not copyable, must be earned.
-
-**delta_opt** — Fine-tuning has two optima: minimum validation loss and maximum behavioral quality. They're not the same point. `delta_opt_distance()` measures how far you are from the sweet spot.
-
-**`.x->[]~`** — A 5-symbol notation for dynamic systems: atom (`.`), collision (`x`), projection (`->`), potential (`[]`), resonance (`~`). The theoretical foundation. Run `void ir` to explore.
-
 ## CLI
 
 ```bash
-void test               # 30 self-checks (IR + patterns + organism + router)
-void profiles           # All 34 V-Score profiles, sorted by V
-void route "your text"  # Route a prompt — shows model selection + reasoning
-void hex "your text"    # Classify text on 6 axes
-void breathe --demo     # 30-second visual demo
-void ir                 # The 5 fundamental operations
-void pulse              # System vitals
-void benchmark          # Run full V-Score benchmark (requires API keys)
+void test                  # 351 self-checks
+void breathe --demo        # 30-second visual demo
+void ir                    # The 5 fundamental operations (.x->[]~)
+void hex "your text"       # Classify text on 6 axes
+void route "your text"     # Route — shows model selection + reasoning
+void profiles              # All 34 V-Score profiles, sorted by V
+void immune                # 5-layer response quality monitor
+void rings                 # Fractal ring graph (Mandelbrot)
+void tune "your text"      # Stribeck parameter tuning
+void pollinate             # Cross-pollination demo (Margulis)
+void api [port]            # Start V-Score API server (default: 7070)
+void score                 # Score a prompt-response pair
+void swarm                 # 5-node swarm network demo (Gordon)
+void edge "your text"      # Stateless classification + V-Score (Wozniak)
+void export                # Portable organism export (full/compact/lite)
+void spec                  # The V-Score Specification (Berners-Lee)
+void certify [model]       # Certify a model against the spec
+void pulse                 # System vitals
+void benchmark             # Full V-Score benchmark (requires API keys)
 ```
+
+## Key Modules
+
+| Module | What | Version |
+|--------|------|---------|
+| `ir.py` | 5 IR types: Atom, Collision, Projection, Potential, Resonance | v0.1.0 |
+| `organism.py` | OrganismBreather — inhale/exhale with growth rings | v0.1.0 |
+| `patterns.py` | CircuitBreaker, @lost_dimensions, Phase detection | v0.1.0 |
+| `profiles.py` | 34 V-Score profiles from benchmark | v0.2.0 |
+| `router.py` | AtemRouter — adaptive model selection | v0.2.0 |
+| `immune.py` | 5-layer immune system, @immune decorator | v0.3.0 |
+| `ring_graph.py` | RingGraph — fractal knowledge with TF-IDF search | v0.4.0 |
+| `tuner.py` | StribeckTuner — auto-tune parameters per hex region | v0.5.0 |
+| `pollinator.py` | CrossPollinator — ring transfer between models | v0.6.0 |
+| `api.py` | VScoreAPI + HTTP server — benchmark-as-a-service | v0.7.0 |
+| `swarm.py` | SwarmNetwork — distributed gossip mesh | v0.8.0 |
+| `edge.py` | Stateless pure functions for serverless | v0.9.0 |
+| `portable.py` | Universal export (full/compact/lite JSON) | v0.9.0 |
+| `spec.py` | V-Score Specification — the living standard | v1.0.0 |
+
+## The V-Score Specification (v1.0.0)
+
+The spec defines everything needed to implement V-Score in any language:
+
+```python
+from void_intelligence import spec_document, check_compliance, certify, ModelCard
+
+# Machine-readable spec
+doc = spec_document()   # dict with 10 sections (§1-§10)
+
+# Validate any V-Score implementation
+result = check_compliance(my_score_fn)  # 19 checks
+result.compliant      # True/False
+result.compliance_rate  # 0.0 - 1.0
+
+# Certify a model
+cert = certify(avg_v=0.12, health_rate=0.95, checks=150)
+cert.name  # "Platinum"
+
+# Generate a standard model card
+card = ModelCard.from_scores("my-model", scores, provider="Acme")
+card.to_markdown()  # Publishable model card
+card.to_json()      # Machine-readable
+```
+
+**Wire Format** — any system producing this JSON is V-Score compatible:
+
+```json
+{
+  "V": 0.0193,
+  "model": "qwen3-14b",
+  "status": "THRIVING",
+  "components": {"E": 0.82, "W": 0.60, "S": 0.50, "B": 0.87, "H": 0.09},
+  "flags": [],
+  "hex_delta": 0.12
+}
+```
+
+**Certification Levels:**
+
+| Level | Min V | Min Health Rate | Min Checks |
+|-------|------:|----------------:|-----------:|
+| Platinum | 0.10 | 95% | 100 |
+| Gold | 0.05 | 90% | 50 |
+| Silver | 0.02 | 80% | 25 |
+| Bronze | 0.01 | 60% | 10 |
+
+## How It Works
+
+**`.x->[]~`** — Five operations describe any dynamic system:
+
+```
+.   Atom        Irreducible fact or event
+x   Collision   Two atoms create something in neither (emergence)
+->  Projection  Collision becomes action (always incomplete — Anti-P3122)
+[]  Potential   Pregnant silence between events (not empty — full)
+~   Resonance   System learns from itself (compound growth)
+```
+
+**Experience Memory** — Each `exhale()` stores a typed growth ring. Rings survive restarts. Swap the model — the memory stays. Your LLM is the body. VOID is the memory.
+
+**Compound Intelligence** — Ring count grows with every interaction. After 6 months, your system has institutional knowledge that no fresh deployment can replicate. The moat grows with time.
+
+**delta_opt** — Fine-tuning has two optima: minimum validation loss and maximum behavioral quality. They're not the same point. `delta_opt_distance()` measures how far you are.
 
 ## Enterprise Use
 
-VOID Intelligence is designed for production:
-
-- **Zero runtime dependencies** — stdlib only
+- **Zero runtime dependencies** — stdlib only. No exceptions.
 - **Local-first** — Best models run on your hardware (qwen3-14b, mistral-7b)
 - **GDPR-native** — No data leaves your infrastructure
 - **Portable state** — JSON files, no database required
 - **Pluggable adapters** — Any LLM via `fn(prompt, system) -> response`
-
-**Example: Fine-tuned local model with experience memory**
-
-```python
-from void_intelligence import AtemRouter, VScoreProfile
-
-# Register your fine-tuned model
-router = AtemRouter()
-router.register_profile(VScoreProfile(
-    name="my-forecast-model",
-    E=0.65, W=0.30, S=0.95, B=0.80, H=0.40, R=0.99, V=0.059,
-    provider="ollama", model_id="my-model:latest",
-    is_local=True, cost_per_m=0.0,
-))
-router.register_adapter("my-forecast-model", my_ollama_fn)
-
-# Every call accumulates experience. After 100 calls,
-# the system knows patterns a fresh install doesn't.
-for entry in customer_data:
-    result = router.breathe(entry, learnings=corrections)
-```
+- **Edge-ready** — `edge.py` runs on Cloudflare Workers, AWS Lambda, Deno Deploy
+- **Spec-compliant** — `check_compliance()` validates any implementation
 
 ## Requirements
 
 - Python >= 3.10
-- Zero runtime dependencies for core
+- Zero runtime dependencies
 
 ```bash
-pip install void-intelligence                          # Core
-pip install "void-intelligence[watch]"                 # + file watcher
-pip install "void-intelligence[mlx]"                   # + Apple Silicon fine-tuning
+pip install void-intelligence
 ```
 
 ## The Vocabulary
 
-| What we say | What it means |
-|-------------|---------------|
+| Term | Meaning |
+|------|---------|
 | **Alive** | V > 0. The model learns from context injection. |
 | **Dead** | V = 0. The model ignores or forgets context. |
-| **Growth Rings** | Persistent records of what worked. Like tree rings — each interaction adds a layer. |
-| **V-Score** | Single metric: does your AI learn? 0 = static. Higher = more adaptive. |
+| **Growth Rings** | Persistent records of what worked. Like tree rings. |
+| **V-Score** | Does your AI learn? 0 = dead. >0.1 = thriving. |
 | **V-Router** | Routes to the best *learner*, not the best *scorer*. |
-| **HexProfile** | 6-axis classification of any text. <0.02ms. No LLM needed. |
-| **Compound Intelligence** | Your AI investment appreciates with every interaction. Like compound interest. |
-| **Experience Memory** | Portable state that survives model swaps and restarts. |
+| **HexBreath** | 6-axis text classification. <0.02ms. No LLM. |
+| **Immune System** | 5-layer response quality gate. Swiss Cheese Model. |
+| **Ring Graph** | Fractal knowledge structure. TF-IDF + graph centrality. |
+| **Stribeck Tuner** | Auto-tune parameters to the friction sweet spot. |
+| **Cross-Pollination** | Knowledge transfer between model organisms. |
+| **Swarm** | Distributed mesh. No leader. Intelligence emerges. |
+| **Compound Intelligence** | AI investment appreciates with every interaction. |
 
 ## License
 

@@ -19,6 +19,10 @@ import math
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from void_intelligence.ring_graph import RingGraph
 
 
 # ── HexBreath: 6-Axis Classification ────────────────────────────
@@ -258,13 +262,17 @@ class OrganismBreather:
         self.hex = HexBreath()
         self.heart = HeartBeat()
         self.rings = GrowthRings()
+        self.graph: RingGraph | None = None  # v0.4.0: fractal ring graph
         self._breath_count = 0
         self._start_time = time.time()
+        self._last_hex: HexCoord | None = None
+        self._last_ring_id: str | None = None  # last ring added to graph
 
     def inhale(self, prompt: str) -> dict:
         """Breathe in. Classify the prompt. Prepare the organism."""
         coord = self.hex.classify(prompt)
         self._breath_count += 1
+        self._last_hex = coord
 
         if self.heart.should_beat():
             self.heart.beat()
@@ -279,20 +287,38 @@ class OrganismBreather:
         }
 
     def exhale(self, response: str = "", learnings: list[str] | None = None) -> dict:
-        """Breathe out. Record what was learned. Grow."""
+        """Breathe out. Record what was learned. Grow.
+
+        Adds rings to both flat list (compat) and graph (v0.4.0+).
+        """
         new_rings = []
         for learning in (learnings or []):
             ring = self.rings.add(learning, "learning")
             new_rings.append(ring.content)
 
+            # v0.4.0: also grow the graph
+            if self.graph is not None:
+                node = self.graph.add(
+                    learning,
+                    ring_type="learning",
+                    hex_coord=self._last_hex,
+                    caused_by=self._last_ring_id,
+                )
+                self._last_ring_id = node.id
+
         self.heart.beat()
 
-        return {
+        result = {
             "breath": self._breath_count,
             "new_rings": new_rings,
             "total_rings": self.rings.count,
             "ring_yield": round(self.rings.ring_yield, 4),
         }
+
+        if self.graph is not None:
+            result["graph"] = self.graph.summary()
+
+        return result
 
     def vitals(self) -> dict:
         """Current vitals of the organism."""
@@ -309,8 +335,8 @@ class OrganismBreather:
 
     def to_dict(self) -> dict:
         """Serialize full organism state for persistence."""
-        return {
-            "version": 1,
+        data = {
+            "version": 2,
             "breath_count": self._breath_count,
             "start_time": self._start_time,
             "heart": {
@@ -330,6 +356,10 @@ class OrganismBreather:
             ],
             "ring_count_by_type": dict(self.rings._ring_count_by_type),
         }
+        # v0.4.0: include graph state
+        if self.graph is not None:
+            data["graph"] = self.graph.to_dict()
+        return data
 
     @classmethod
     def from_dict(cls, data: dict) -> "OrganismBreather":
@@ -356,6 +386,22 @@ class OrganismBreather:
 
             rbt = data.get("ring_count_by_type", {})
             org.rings._ring_count_by_type = {str(k): int(v) for k, v in rbt.items()}
+
+            # v0.4.0: restore graph if present
+            graph_data = data.get("graph")
+            if graph_data:
+                from void_intelligence.ring_graph import RingGraph
+                org.graph = RingGraph.from_dict(graph_data)
         except (TypeError, ValueError, KeyError):
             return cls()
         return org
+
+    def enable_graph(self) -> None:
+        """Enable the ring graph (v0.4.0). Migrates existing flat rings."""
+        if self.graph is not None:
+            return
+        from void_intelligence.ring_graph import RingGraph
+        self.graph = RingGraph()
+        # Migrate existing flat rings into the graph
+        for ring in self.rings.rings:
+            self.graph.add(ring.content, ring_type=ring.ring_type)

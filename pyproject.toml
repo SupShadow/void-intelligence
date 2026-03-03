@@ -4,17 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "void-intelligence"
-version = "0.2.0"
-description = "65% of frontier AI is dead. V-Score measures which models actually learn. Zero dependencies."
+version = "1.0.0"
+description = "The industry builds models that think. We build models that breathe. V-Score specification, immune system, fractal knowledge, swarm intelligence, edge functions. 351 tests. Zero dependencies."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Julian Guggeis", email = "julian@guggeis.de" },
 ]
-keywords = ["ai", "llm", "v-score", "model-routing", "adaptive-ai", "compound-intelligence", "void", "intelligence", "fine-tuning", "experience-memory"]
+keywords = ["ai", "llm", "v-score", "model-routing", "adaptive-ai", "compound-intelligence", "void", "intelligence", "organism", "swarm", "immune-system", "specification"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
@@ -34,7 +34,7 @@ all = ["watchdog>=3.0", "mlx>=0.21", "mlx-lm>=0.21"]
 void = "void_intelligence.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/guggeis/void-intelligence"
+Homepage = "https://github.com/SupShadow/void-intelligence"
 Documentation = "https://void.guggeis.de"
 
 [tool.hatch.build.targets.wheel]
