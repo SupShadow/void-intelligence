@@ -7,7 +7,7 @@
 > The industry builds models that think. We build models that breathe.
 
 [![v1.0.0](https://img.shields.io/badge/v1.0.0-The_Standard-blue.svg)](CHANGELOG.md)
-[![377 Tests](https://img.shields.io/badge/377_tests-passing-brightgreen.svg)](#self-tests)
+[![402 Tests](https://img.shields.io/badge/402_tests-passing-brightgreen.svg)](#self-tests)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-brightgreen.svg)](#requirements)
 [![MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -106,8 +106,30 @@ After 1,000 — no competitor can replicate your accumulated experience.
 
 **Like compound interest, but for AI.**
 
+### Claude Code Plugin
+
 ```bash
-void test     # 377 self-checks, zero dependencies
+pip install void-intelligence[mcp]
+```
+
+Add to `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "void": {
+      "type": "stdio",
+      "command": "void",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+Claude Code now has a living memory. Every session builds growth rings. The next session is smarter because the previous one lived. [Full setup guide](docs/claude-code-plugin.md)
+
+```bash
+void test     # 402 self-checks, zero dependencies
 void spec     # The V-Score Specification
 ```
 
@@ -330,6 +352,7 @@ void export                # Portable export (full/compact/lite)
 void spec                  # The V-Score Specification
 void certify [model]       # Certify against the spec
 void proof                 # The Proof: old + VOID > frontier
+void mcp                   # Start MCP server (Claude Code plugin)
 void pulse                 # System vitals
 ```
 

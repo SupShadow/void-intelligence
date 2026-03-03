@@ -2,6 +2,29 @@
 
 All notable changes to void-intelligence are documented here.
 
+## [1.1.0] — 2026-03-03
+
+### Added
+- **Claude Code Plugin** — VOID as an MCP server. `void mcp` starts the server. Every Claude Code session builds growth rings. The next session is smarter because the previous one lived.
+- **`mcp_server.py`** — Full MCP server implementation with 6 tools:
+  - `void_breathe` — Record a learning cycle (inhale prompt, exhale response, grow ring)
+  - `void_score` — Score any prompt-response pair (V = E × W × S × B × H)
+  - `void_vitals` — Organism health: rings, breaths, pulse, recent learnings
+  - `void_rings` — Search accumulated experience from past sessions
+  - `void_classify` — 6-axis HexBreath classification (<0.02ms, no LLM)
+  - `void_immune` — 5-layer Swiss Cheese quality check
+- **Persistence** — `.void/organism.json` + `.void/rings.jsonl` in project directory. Auto `.gitignore`.
+- **Optional dependency** — `pip install void-intelligence[mcp]` adds MCP support. Core stays zero-dep.
+- **CLI: `void mcp`** — Start the MCP server
+- **402 self-tests** (was 377) — 25 new MCP server tests
+- **`docs/claude-code-plugin.md`** — Full setup guide
+- **`docs/marketing-architecture.md`** — G. × VOID marketing and distribution architecture
+
+### Design
+Claude Code has memory (CLAUDE.md, auto-memory). But it's unstructured text. VOID adds STRUCTURED learning with V-Score measurement, cross-session growth rings, and a searchable experience graph. Every project gets its own organism. The organism persists between sessions via `OrganismBreather.to_dict()` / `.from_dict()`. The MCP server uses the standard `mcp.server` pattern with `asyncio.to_thread()` for all blocking operations. `mcp` is an optional dependency — the rest of void-intelligence works without it.
+
+---
+
 ## [1.0.0] — 2026-03-03
 
 ### Added

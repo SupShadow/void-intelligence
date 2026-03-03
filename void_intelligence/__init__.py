@@ -148,7 +148,7 @@ from void_intelligence.proof import (
     get_tasks,
 )
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     # IR Types

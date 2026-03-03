@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "void-intelligence"
-version = "1.0.0"
-description = "The industry builds models that think. We build models that breathe. V-Score specification, immune system, fractal knowledge, swarm intelligence, edge functions. 351 tests. Zero dependencies."
+version = "1.1.0"
+description = "The industry builds models that think. We build models that breathe. Claude Code plugin, V-Score specification, immune system, fractal knowledge, swarm intelligence. 402 tests. Zero dependencies."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -28,7 +28,8 @@ classifiers = [
 [project.optional-dependencies]
 watch = ["watchdog>=3.0"]
 mlx = ["mlx>=0.21", "mlx-lm>=0.21"]
-all = ["watchdog>=3.0", "mlx>=0.21", "mlx-lm>=0.21"]
+mcp = ["mcp>=1.0"]
+all = ["watchdog>=3.0", "mlx>=0.21", "mlx-lm>=0.21", "mcp>=1.0"]
 
 [project.scripts]
 void = "void_intelligence.cli:main"

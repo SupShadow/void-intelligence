@@ -10,4 +10,5 @@ build/
 .env
 *.sqlite3
 .void-intelligence/
+.void/
 SHOW_HN.md

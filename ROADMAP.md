@@ -3,32 +3,37 @@
 > 8 Versions. 8 Geniuses. From breathing to industry standard.
 > Each version = one genius collision that unlocks the next capability.
 
-## Current: v1.0.0 — The Standard (Tim Berners-Lee)
+## Current: v1.1.0 — Claude Code Plugin
+
+**Core:** VOID as MCP server for Claude Code. Every session builds growth rings. The next session is smarter.
+
+### Shipped
+
+- [x] MCP server (`mcp_server.py`) — 6 tools: breathe, score, vitals, rings, classify, immune
+- [x] Persistence — `.void/organism.json` + `.void/rings.jsonl` per project
+- [x] Optional dependency — `pip install void-intelligence[mcp]`
+- [x] CLI: `void mcp` — starts the MCP server
+- [x] Setup guide — `docs/claude-code-plugin.md`
+- [x] Marketing architecture — `docs/marketing-architecture.md`
+- [x] 402/402 tests (25 new MCP tests)
+
+---
+
+## v1.0.0 — The Standard (Tim Berners-Lee)
 
 **Genius:** Tim Berners-Lee (World Wide Web, 1989)
 **Core:** V-Score becomes the industry standard for measuring AI model adaptiveness.
-
-**Why Berners-Lee:** He didn't build the best hypertext system. He built an OPEN STANDARD that everyone adopted because it was simple, free, and useful. V-Score follows the same path.
 
 ### Shipped
 
 - [x] V-Score Specification — formal document with 10 sections (§1-§10)
 - [x] Reference implementation — this library IS the reference
-- [x] `VScoreComponents` — frozen dataclass, `.V` property, multiplicative formula
-- [x] `v_score_status()` — 5 status levels (DEAD → THRIVING)
-- [x] `CertificationLevel` — 4 levels: Platinum, Gold, Silver, Bronze
-- [x] `certify()` — Returns highest qualifying certification
-- [x] `ModelCard` — Standard format with `.from_scores()`, `.to_markdown()`, `.to_json()`
-- [x] `check_compliance()` — 19-check validator for any V-Score implementation
-- [x] `spec_document()` — Machine-readable spec as dict
-- [x] `spec_markdown()` — Generates full spec as Markdown
+- [x] `VScoreComponents`, `v_score_status()`, `CertificationLevel`, `certify()`
+- [x] `ModelCard`, `check_compliance()`, `spec_document()`, `spec_markdown()`
 - [x] `WIRE_FORMAT` — JSON Schema for interoperable V-Score results
-- [x] CLI: `void spec` + `void certify`
-- [x] 351/351 tests, zero dependencies
-
-**Key Metric:** Adoption — how many model providers display V-Scores?
-
-**Enterprise Term:** The V-Score Standard
+- [x] CLI: `void spec` + `void certify` + `void proof`
+- [x] The Proof: GPT-4 + VOID > GPT-5.3 Codex (+29%)
+- [x] 377/377 tests, zero dependencies
 
 ---
 

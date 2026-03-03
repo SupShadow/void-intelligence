@@ -11,6 +11,7 @@ Usage:
     void pulse                # Show system pulse
     void spec                 # The V-Score Specification (v1.0.0)
     void certify [model]      # Certify a model against the spec
+    void mcp                  # Start MCP server (Claude Code plugin)
 """
 
 from __future__ import annotations
@@ -1230,6 +1231,77 @@ def cmd_test():
     check("Proof to_dict has lift", "lift" in report.to_dict())
     check("Proof reproducible", run_proof(seed=42).old_avg_v == report.old_avg_v)
 
+    # ── MCP Server tests (v1.1.0) ──────────────────────────────
+    import tempfile
+    import os
+    from void_intelligence.mcp_server import VoidProvider, _load_organism, _save_organism
+
+    # Test provider creation
+    mcp_provider = VoidProvider()
+    check("MCP provider created", mcp_provider is not None)
+    check("MCP organism lazy", mcp_provider._organism is None)
+
+    # Test organism access
+    org = mcp_provider.organism
+    check("MCP organism loaded", org is not None)
+    check("MCP organism type", isinstance(org, OrganismBreather))
+
+    # Test breathe
+    br = mcp_provider.breathe(
+        prompt="How do I write tests?",
+        response="Use pytest with clear assertions.",
+        learnings=["pytest preferred", "clear assertions"],
+    )
+    check("MCP breathe success", br["success"] is True)
+    check("MCP breathe v_score", "V" in br["v_score"])
+    check("MCP breathe learnings", br["learnings_recorded"] == 2)
+    check("MCP breathe rings", br["rings_total"] >= 2)
+
+    # Test score (read-only)
+    sc = mcp_provider.score(
+        prompt="Explain decorators",
+        response="Decorators wrap functions to add behavior.",
+    )
+    check("MCP score success", sc["success"] is True)
+    check("MCP score V", "V" in sc["v_score"])
+    check("MCP score components", "components" in sc["v_score"])
+
+    # Test vitals
+    vt = mcp_provider.vitals()
+    check("MCP vitals success", vt["success"] is True)
+    check("MCP vitals alive", vt["alive"] is True)
+    check("MCP vitals breaths", vt["breaths"] >= 1)
+
+    # Test classify
+    cl = mcp_provider.classify("Build an urgent prototype for the team")
+    check("MCP classify success", cl["success"] is True)
+    check("MCP classify axes", "ruhe_druck" in cl["axes"])
+    check("MCP classify 6 axes", len(cl["axes"]) == 6)
+
+    # Test immune check
+    im = mcp_provider.immune_check(
+        prompt="Write a sales email",
+        response="Here is a professional sales email about our product offering.",
+    )
+    check("MCP immune success", im["success"] is True)
+    check("MCP immune healthy", im["healthy"] is True)
+    check("MCP immune severity", im["severity"] == "healthy")
+    check("MCP immune layers", "coherence" in im["layer_scores"])
+
+    # Test rings search
+    rg = mcp_provider.rings(query="pytest")
+    check("MCP rings success", rg["success"] is True)
+    check("MCP rings has total", "total" in rg)
+
+    # Test persistence roundtrip
+    org_fresh = OrganismBreather()
+    org_fresh.inhale("persistence test")
+    org_fresh.exhale("persisted", learnings=["roundtrip works"])
+    saved = org_fresh.to_dict()
+    restored = OrganismBreather.from_dict(saved)
+    check("MCP persistence rings", restored.rings.count == org_fresh.rings.count)
+    check("MCP persistence breaths", restored._breath_count == org_fresh._breath_count)
+
     print()
     print(f"    {passed}/{total} tests passed.")
     print()
@@ -2033,6 +2105,7 @@ def main() -> int:
         print("    void spec             The V-Score Specification (Berners-Lee)")
         print("    void certify [model]  Certify a model against the V-Score spec")
         print("    void proof            The Proof: old + VOID > frontier")
+        print("    void mcp              Start MCP server (Claude Code plugin)")
         print("    void --version        Show version")
         print()
         print("  pip install void-intelligence")
@@ -2145,6 +2218,11 @@ def main() -> int:
 
     if cmd == "proof":
         cmd_proof()
+        return 0
+
+    if cmd == "mcp":
+        from void_intelligence.mcp_server import main as mcp_main
+        mcp_main()
         return 0
 
     if cmd == "benchmark":
