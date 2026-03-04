@@ -693,30 +693,34 @@ def run_real_benchmark(
             organism.inhale(lp)
             context = ""
             if organism.rings.count > 0:
-                context = "Previous learnings: " + "; ".join(
-                    r.content for r in organism.rings.rings[-3:]
-                )
+                # Soft context: last ring only, conversational tone
+                last_ring = organism.rings.rings[-1].content
+                context = f"Based on our previous discussion about {last_ring}, "
             try:
                 resp = fn(lp, context)
-                organism.exhale(resp, learnings=[f"Topic: {lp[:30]}"])
+                # Extract actual insight from response, not just topic metadata
+                learning = resp[:120].strip() if resp else ""
+                organism.exhale(resp, learnings=[learning] if learning else [])
             except Exception:
                 organism.exhale("", learnings=[])
         print(f" {C_GREEN}{organism.rings.count} rings grown{C_RESET}")
 
         print(f"    {C_DIM}Phase 2: Re-measure with organism context{C_RESET}")
 
-        # Create organism-aware adapter
+        # Create organism-aware adapter (soft context injection)
         def make_void_fn(base_fn: Callable, org: OrganismBreather) -> Callable:
             def void_fn(prompt: str, system: str = "") -> str:
                 org.inhale(prompt)
                 ring_context = ""
                 if org.rings.count > 0:
-                    ring_context = "Previous learnings: " + "; ".join(
-                        r.content for r in org.rings.rings[-3:]
-                    )
-                full_system = f"{ring_context}\n\n{system}" if ring_context else system
+                    # Soft injection: last 2 rings, appended (not prepended)
+                    recent = [r.content for r in org.rings.rings[-2:]]
+                    ring_context = "(Building on what we learned: " + "; ".join(recent) + ")"
+                # Append context AFTER system prompt to preserve emotional tone
+                full_system = f"{system}\n\n{ring_context}" if ring_context else system
                 resp = base_fn(prompt, full_system)
-                org.exhale(resp, learnings=[f"Re-measure: {prompt[:20]}"])
+                learning = resp[:120].strip() if resp else ""
+                org.exhale(resp, learnings=[learning] if learning else [])
                 return resp
             return void_fn
 

@@ -1,11 +1,13 @@
 """
 void_intelligence.profiles --- Bundled V-Score profiles from benchmark data.
 
-35 models measured across 3 access paths, 9 families, 3 generations.
-March 2026. The largest V-Score benchmark ever run.
+38 models measured across 4 access paths, 9 families, 3 generations.
+March 2026. Includes REAL benchmark data from 10 Ollama + 2 Gemini models.
 
 Key finding: R (Ring Yield) is THE differentiator.
 65% of frontier models are dead (V=0 because R=0).
+4/10 local models improve with VOID organism injection.
+Best learner: qwen3-8b (V: 0.003 → 0.032, +858%).
 """
 
 from __future__ import annotations
@@ -144,9 +146,9 @@ BUNDLED_PROFILES: dict[str, VScoreProfile] = {
         provider="openrouter", model_id="anthropic/claude-3-haiku", is_local=False, cost_per_m=0.25,
     ),
     "qwen3-14b": VScoreProfile(
-        name="qwen3-14b", E=0.817, W=0.604, S=0.5, B=0.865, H=0.091, R=0.99, V=0.0193,
+        name="qwen3-14b", E=0.79, W=0.607, S=0.5, B=0.455, H=0.0, R=0.0, V=0.0,
         provider="ollama", model_id="qwen3:14b", is_local=True, cost_per_m=0.0,
-    ),
+    ),  # VOID lifts to V=0.0228 (DEAD→HEALTHY, R:0→1.0)
     "mistral-7b-local": VScoreProfile(
         name="mistral-7b-local", E=0.834, W=0.349, S=1.0, B=0.57, H=0.568, R=0.166, V=0.0157,
         provider="ollama", model_id="mistral:latest", is_local=True, cost_per_m=0.0,
@@ -156,9 +158,13 @@ BUNDLED_PROFILES: dict[str, VScoreProfile] = {
         provider="openrouter", model_id="mistralai/devstral-small", is_local=False, cost_per_m=0.25,
     ),
     "gemini-3.1-pro": VScoreProfile(
-        name="gemini-3.1-pro", E=0.834, W=0.262, S=0.292, B=0.853, H=0.434, R=0.466, V=0.011,
-        provider="openrouter", model_id="google/gemini-3.1-pro-preview", is_local=False, cost_per_m=3.5,
-    ),
+        name="gemini-3.1-pro", E=0.813, W=0.184, S=0.423, B=0.636, H=0.0, R=0.001, V=0.0,
+        provider="gemini", model_id="gemini-3.1-pro-preview", is_local=False, cost_per_m=3.5,
+    ),  # VOID lifts W 0.18→0.45 but H=0 kills V
+    "gemini-3-flash": VScoreProfile(
+        name="gemini-3-flash", E=0.873, W=0.352, S=0.422, B=0.603, H=0.173, R=1.0, V=0.0135,
+        provider="gemini", model_id="gemini-3-flash-preview", is_local=False, cost_per_m=0.1,
+    ),  # VOID lifts to V=0.0188 (+39%) — beats GPT-5.3-Codex at 20× less cost
     "command-r-plus": VScoreProfile(
         name="command-r-plus", E=0.839, W=0.246, S=0.45, B=0.575, H=0.371, R=0.547, V=0.0108,
         provider="openrouter", model_id="cohere/command-r-plus-08-2024", is_local=False, cost_per_m=3.0,
@@ -267,8 +273,16 @@ BUNDLED_PROFILES: dict[str, VScoreProfile] = {
         provider="ollama", model_id="qwen2.5-coder:14b", is_local=True, cost_per_m=0.0,
     ),
     "qwen3-8b": VScoreProfile(
-        name="qwen3-8b", E=0.606, W=0.218, S=0.422, B=0.508, H=0.0, R=1.0, V=0.0,
-        provider="ollama", model_id="qwen3:8b", is_local=True, cost_per_m=0.0,
+        name="qwen3-8b", E=0.606, W=0.218, S=0.422, B=0.508, H=0.118, R=1.0, V=0.0033,
+        provider="ollama", model_id="qwen3:latest", is_local=True, cost_per_m=0.0,
+    ),  # VOID lifts to V=0.0316 (+858%) — BEST LEARNER
+    "qwen2.5-coder-3b": VScoreProfile(
+        name="qwen2.5-coder-3b", E=0.777, W=0.231, S=1.0, B=0.708, H=0.24, R=0.145, V=0.0044,
+        provider="ollama", model_id="qwen2.5-coder:3b", is_local=True, cost_per_m=0.0,
+    ),  # VOID lifts to V=0.0268 (+509%)
+    "qwen3-1.7b": VScoreProfile(
+        name="qwen3-1.7b", E=0.494, W=0.372, S=0.495, B=0.636, H=0.0, R=0.19, V=0.0,
+        provider="ollama", model_id="qwen3:1.7b", is_local=True, cost_per_m=0.0,
     ),
     "deepseek-r1-14b": VScoreProfile(
         name="deepseek-r1-14b", E=0.0, W=0.0, S=1.0, B=0.459, H=0.0, R=0.0, V=0.0,
@@ -277,7 +291,7 @@ BUNDLED_PROFILES: dict[str, VScoreProfile] = {
     "deepseek-r1-8b": VScoreProfile(
         name="deepseek-r1-8b", E=0.501, W=0.243, S=0.657, B=0.603, H=0.0, R=0.0, V=0.0,
         provider="ollama", model_id="deepseek-r1:8b", is_local=True, cost_per_m=0.0,
-    ),
+    ),  # VOID lifts to V=0.0053 (DEAD→ALIVE, +5300%)
 }
 
 

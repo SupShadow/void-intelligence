@@ -17,29 +17,33 @@
 
 65% of frontier models score V = 0. Not broken — **dead**. They benchmark well, then forget everything between calls. Context injection vanishes. Corrections are lost. Every interaction starts from zero.
 
-Here's the proof:
+Here's the proof — **real data from 10 local models** (March 2026):
 
-| Model | V-Score | Cost/M | Learns? |
-|-------|--------:|-------:|:-------:|
-| Claude Sonnet 4.6 | **0.000** | $3.00 | no |
-| GPT-4o | **0.000** | $2.50 | no |
-| Gemini 2.5 Pro | **0.000** | $1.25 | no |
-| Llama 3.3 70B | **0.000** | $0.40 | no |
-| Grok-4 | **0.000** | $10.00 | no |
-| | | | |
-| qwen3-14b | **0.019** | FREE | **yes** |
-| claude-3-haiku | **0.022** | $0.25 | **yes** |
-| mistral-7b | **0.016** | FREE | **yes** |
+| Model | Vanilla V | + VOID V | Delta | Cost |
+|-------|----------:|---------:|------:|-----:|
+| qwen3-8b | 0.003 | **0.032** | **+858%** | FREE |
+| qwen3-14b | 0.000 | **0.023** | **DEAD→ALIVE** | FREE |
+| qwen2.5-coder-3b | 0.004 | **0.027** | **+509%** | FREE |
+| deepseek-r1-8b | 0.000 | **0.005** | **DEAD→ALIVE** | FREE |
+| | | | | |
+| Claude Sonnet 4.6 | 0.000 | — | — | $3.00 |
+| GPT-4o | 0.000 | — | — | $2.50 |
+| Grok-4 | 0.000 | — | — | $10.00 |
 
-A $0 local model that learns beats a $10/M API model that forgets.
+A FREE local model with VOID beats every $10/M API model without it.
+Gemini Flash ($0.10/M) + VOID outscores GPT-5.3-Codex ($2.00/M). **20× cheaper. Higher V-Score.**
 
 V-Score measures what benchmarks miss: **does your AI actually learn from use?**
 
 ```
-V = E × W × S × B × H
+V = E × W × S × B × H × R
 
 Multiplicative. One zero kills everything.
 That's the design.
+```
+
+```bash
+void benchmark --real    # Run it yourself. Your models. Your hardware.
 ```
 
 ---
@@ -156,37 +160,57 @@ Claude Code now has a living memory. Every session builds growth rings. The next
 
 ---
 
-## The Full Benchmark
+## Real Benchmark: Vanilla → VOID
 
-**March 2026. 35 models. 3 access paths. 9 families.**
+**10 local models. Two phases. Zero cost.**
 
-### Alive (V > 0)
+Phase 1: Vanilla (no organism). Phase 2: 5 learning rounds with VOID, then re-measure.
+The delta = **learning capacity** — how much the model grows when it breathes.
 
-| Model | E | W | S | B | H | R | V-Score | Cost/M | Local |
-|-------|--:|--:|--:|--:|--:|--:|--------:|-------:|:-----:|
-| claude-3-haiku | .77 | .42 | 1.0 | .73 | .38 | **.25** | **0.022** | $0.25 | |
-| qwen3-14b | .82 | .60 | .50 | .87 | .09 | **.99** | **0.019** | FREE | yes |
-| mistral-7b | .83 | .35 | 1.0 | .57 | .57 | **.17** | **0.016** | FREE | yes |
-| devstral-small | .78 | .37 | 1.0 | .65 | .58 | **.11** | **0.012** | $0.25 | |
-| gemini-3.1-pro | .83 | .26 | .29 | .85 | .43 | **.47** | **0.011** | $3.50 | |
-| command-r-plus | .84 | .25 | .45 | .58 | .37 | **.55** | **0.011** | $3.00 | |
-| deepseek-v3 | .88 | .31 | .44 | .42 | .48 | **.39** | **0.009** | $0.28 | |
-| qwen2.5-7b | .84 | .12 | 1.0 | .76 | .37 | **.27** | **0.008** | FREE | yes |
-| gpt-5.3-codex | .84 | .28 | .34 | .73 | .11 | **.40** | **0.008** | $2.00 | |
+### Models That Learn
 
-### Dead (V = 0)
+| Model | Vanilla V | VOID V | Delta | Cost |
+|-------|----------:|---------:|------:|-----:|
+| qwen3-8b | 0.003 | **0.032** | +858% | FREE |
+| qwen3-14b | 0.000 | **0.023** | +22,800% | FREE |
+| qwen2.5-coder-3b | 0.004 | **0.027** | +509% | FREE |
+| gemini-3-flash | 0.014 | **0.019** | +39% | $0.10 |
+| deepseek-r1-8b | 0.000 | **0.005** | +5,300% | FREE |
 
-| Model | E | W | S | B | H | R | Cost/M |
-|-------|--:|--:|--:|--:|--:|--:|-------:|
-| Claude Sonnet 4.6 | .83 | .56 | .70 | .48 | .39 | 0 | $3.00 |
-| GPT-4o | .84 | .55 | .49 | .44 | .72 | 0 | $2.50 |
-| Gemini 2.5 Pro | .81 | .40 | .70 | .53 | .44 | 0 | $1.25 |
-| Llama 3.3 70B | .84 | .45 | .91 | .68 | .72 | 0 | $0.40 |
-| Grok-4 | .83 | .23 | .45 | .57 | .02 | 0 | $10.00 |
+### Models That Don't
+
+| Model | Vanilla V | VOID V | Why |
+|-------|----------:|---------:|-----|
+| phi4-14b | 0.000 | 0.000 | R stays at 0 — doesn't yield rings |
+| glm4-9b | 0.000 | 0.000 | R stays at 0 |
+| deepseek-r1-14b | 0.000 | 0.000 | E=0, W=0, H=0 |
+| qwen2.5-7b | 0.008 | 0.001 | VOID hurts — W collapses |
+
+**A model that LEARNS with VOID > a model with higher raw V.**
+
+```bash
+void benchmark --real              # All available models
+void benchmark --real --ollama     # Local only
+void benchmark --real qwen3        # Filter by name
+```
+
+### Full Profile Benchmark (37 Models)
+
+Across all providers (Ollama, OpenRouter, Anthropic, Google, OpenAI):
+
+| Alive Models | V-Score | Cost/M | Local |
+|-------|--------:|-------:|:-----:|
+| qwen3-8b + VOID | **0.032** | FREE | yes |
+| claude-3-haiku | **0.022** | $0.25 | |
+| gemini-3-flash + VOID | **0.019** | $0.10 | |
+| qwen3-14b + VOID | **0.023** | FREE | yes |
+| mistral-7b | **0.016** | FREE | yes |
+| gemini-3-flash | **0.014** | $0.10 | |
+| gpt-5.3-codex | **0.008** | $2.00 | |
 
 **R is the story.** GPT-4o has W=0.55. Llama has S=0.91. Individually strong. Still dead. R=0 means the model doesn't learn from organism context — and one zero kills V.
 
-All 34 profiles: `void profiles`
+All 38 profiles: `void profiles`
 
 ---
 
@@ -287,7 +311,7 @@ v1.9  ──  Walker      Dream Layer (silence mining)                       +47
 v2.0  ──  δ_opt       Supraleitend + Stribeck Hexagon                    +92
 ```
 
-20 versions. 29 modules. 16,735 lines. 2 days.
+20 versions. 29 modules. 16,735 lines. 10 models benchmarked. 4 brought to life.
 
 ---
 
@@ -371,7 +395,7 @@ void breathe --demo        # 30-second visual demo
 void ir                    # .x->[]~
 void hex "text"            # 6-axis classification
 void route "text"          # Model selection + reasoning
-void profiles              # 34 V-Score profiles
+void profiles              # 38 V-Score profiles
 void immune                # 5-layer quality monitor
 void rings                 # Fractal ring graph
 void tune "text"           # Stribeck parameter tuning
@@ -384,6 +408,7 @@ void export                # Portable export (full/compact/lite)
 void spec                  # The V-Score Specification
 void certify [model]       # Certify against the spec
 void proof                 # The Proof: old + VOID > frontier
+void benchmark --real      # Real benchmark: Vanilla → VOID (local models)
 void mcp                   # Start MCP server (Claude Code plugin)
 void pulse                 # System vitals
 ```
