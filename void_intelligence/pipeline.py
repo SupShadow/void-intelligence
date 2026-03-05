@@ -201,6 +201,7 @@ class BreathCycle:
     model: str = ""
     latency_ms: float = 0.0
     learnings: list[str] = field(default_factory=list)
+    raw_response_len: int = 0  # Guggeisisches Empowern: TRUE output length (incl. <think>)
 
     @property
     def alive(self) -> bool:
@@ -707,6 +708,9 @@ class IRPipeline:
         # -> PROJECT (single adapter call, then analyze)
         enriched = self._enrich_system_prompt(system_prompt, cycle.collisions)
         response = adapter(prompt, enriched)
+        # Guggeisisches Empowern: capture raw output length for honest measurement
+        # _raw_len = full output incl. <think> tags before stripping
+        cycle.raw_response_len = getattr(adapter, "_raw_len", len(response))
         cycle.projection, cycle.lost_dimensions = self.project(
             prompt, response, cycle.collisions,
         )

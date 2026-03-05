@@ -55,6 +55,7 @@ class AtemResult:
     new_rings: list[str]
     vitals_after: dict
     latency_ms: float
+    raw_response_len: int = 0  # Guggeisisches Empowern: TRUE output length
 
 
 class AtemRouter:
@@ -281,6 +282,9 @@ class AtemRouter:
             # Execute (single pass)
             response = adapter(prompt, decision.system_prompt)
 
+        # Guggeisisches Empowern: capture raw output length for honest measurement
+        raw_response_len = getattr(adapter, "_raw_len", len(response))
+
         # v0.5.0: auto-tune via immune feedback
         if self._auto_tune and decision.parameters is not None:
             try:
@@ -295,6 +299,7 @@ class AtemRouter:
 
         result = self.exhale(decision, response, learnings)
         result.latency_ms = (time.time() - t_start) * 1000
+        result.raw_response_len = raw_response_len
 
         # v0.6.0: auto-pollinate every N breaths
         self._breath_since_pollinate += 1

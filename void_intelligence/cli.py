@@ -2100,11 +2100,13 @@ def main() -> int:
         print("    void api [port]       Start V-Score API server (Page/Brin)")
         print("    void score            Score a prompt-response pair")
         print("    void swarm            Swarm network demo (Gordon)")
+        print('    void lichtung "text"  VOID Schwarm: N Atomits × = Lichtung')
         print("    void edge \"text\"      Stateless VOID for edge/serverless (Wozniak)")
         print("    void export           Portable organism export")
         print("    void spec             The V-Score Specification (Berners-Lee)")
         print("    void certify [model]  Certify a model against the V-Score spec")
         print("    void proof            The Proof: old + VOID > frontier")
+        print("    void discover          Let your models tell you who they are")
         print("    void mcp              Start MCP server (Claude Code plugin)")
         print("    void --version        Show version")
         print()
@@ -2258,6 +2260,94 @@ def main() -> int:
         print(f"    Heartbeat: {v['heartbeats']} ({v['bpm']} bpm)")
         print(f"    Rings:     {v['rings']['total']}")
         print()
+        return 0
+
+    if cmd == "discover":
+        from void_intelligence.adapters import discover_models, load_identities
+
+        # --rediscover: re-interview ALL models, even those with existing identities
+        rediscover = "--rediscover" in args or "--all" in args
+        # --model: interview specific model only
+        specific_model = None
+        for i, a in enumerate(args):
+            if a == "--model" and i + 1 < len(args):
+                specific_model = args[i + 1]
+
+        if rediscover:
+            # Clear existing to force re-interview
+            models_list = [specific_model] if specific_model else None
+        elif specific_model:
+            models_list = [specific_model]
+        else:
+            # Only interview models that don't have identities yet
+            existing = load_identities()
+            from void_intelligence.adapters import detect_available, MODEL_REGISTRY
+            available = detect_available()
+            ollama_ids = set(available.get("ollama", []))
+            models_list = []
+            for name, meta in MODEL_REGISTRY.items():
+                if meta["provider"] == "ollama" and meta["model_id"] in ollama_ids:
+                    if name not in existing:
+                        models_list.append(name)
+            if not models_list and not existing:
+                models_list = None  # let discover_models auto-detect all
+            elif not models_list:
+                print()
+                print(f"  All {len(existing)} available models already have identities.")
+                print(f"  Use --rediscover to re-interview them.")
+                print()
+                # Show existing
+                for name, ident in existing.items():
+                    chosen = ident.get("chosen_name", "?")
+                    role = ident.get("role", "?")
+                    temp = ident.get("self_temperature", 0.7)
+                    print(f"    {name:20s} → {chosen} ({role}, t={temp})")
+                print()
+                return 0
+
+        discover_models(models=models_list, verbose=True)
+        return 0
+
+    if cmd == "lichtung":
+        prompt = " ".join(args[1:]) if len(args) > 1 else ""
+        if not prompt or prompt.startswith("--"):
+            print()
+            print("  void lichtung --- The VOID Schwarm")
+            print("  Dicht invertiert = duenn = Lichtung.")
+            print()
+            print("  Usage:")
+            print('    void lichtung "What is time?"')
+            print('    void lichtung "Was ist Bewusstsein?" --max 4')
+            print()
+            return 0
+
+        max_atomits = 6
+        for i, a in enumerate(args):
+            if a == "--max" and i + 1 < len(args):
+                try:
+                    max_atomits = int(args[i + 1])
+                except ValueError:
+                    pass
+
+        marathon = "--marathon" in args
+        rounds = 6
+        for i, a in enumerate(args):
+            if a == "--rounds" and i + 1 < len(args):
+                try:
+                    rounds = int(args[i + 1])
+                except ValueError:
+                    pass
+
+        from void_intelligence.lichtung import VoidSchwarm
+        schwarm = VoidSchwarm(max_atomits=max_atomits, ollama_only=True)
+        if marathon:
+            import time as _t
+            out = f"data/schwarm/marathon-{int(_t.time())}.jsonl"
+            import os
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            schwarm.marathon(prompt, rounds=rounds, out_path=out)
+        else:
+            schwarm.breathe(prompt)
         return 0
 
     print(f"  Unknown command: {cmd}")

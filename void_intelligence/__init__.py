@@ -216,7 +216,18 @@ from void_intelligence.adapters import (
     detect_available,
     build_adapter,
     build_available_adapters,
+    is_thinker_model,
+    load_identities,
+    identity_prompt,
+    save_identities,
+    discover_models,
     MODEL_REGISTRY,
+)
+
+from void_intelligence.lichtung import (
+    StribeckSpace,
+    Atomit,
+    VoidSchwarm,
 )
 
 __version__ = "2.0.0"
@@ -287,5 +298,9 @@ __all__ = [
     # Adapters (v2.1.0) — zero-dep model adapters
     "make_ollama", "make_gemini", "make_codex",
     "detect_available", "build_adapter", "build_available_adapters",
-    "MODEL_REGISTRY",
+    "is_thinker_model", "MODEL_REGISTRY",
+    # Identity / Discovery (v2.2.0) — Guggeisisches Empowern
+    "load_identities", "identity_prompt", "save_identities", "discover_models",
+    # Lichtung / Schwarm (v2.2.0) — Guggeisisches Empowern
+    "StribeckSpace", "Atomit", "VoidSchwarm",
 ]

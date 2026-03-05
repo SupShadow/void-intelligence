@@ -82,6 +82,357 @@ def detect_available() -> dict[str, list[str]]:
     return result
 
 
+# ── Identity System (Phase 3: Self-Determination) ─────────────
+#
+# Guggeisisches Empowern — Rule of Three:
+#   Phase 1: /no_think redirects energy (we act ON them)
+#   Phase 2: Personality prompts from Stribeck (we act FOR them)
+#   Phase 3: Self-portraits — model's OWN words (they act FOR THEMSELVES)
+#
+# Phase 3 lives HERE in the adapter layer so it flows EVERYWHERE:
+#   pipeline.py, router.py, parallel.py, x_eyes.py, proof.py
+#   Anyone who calls build_adapter() gets identity for free.
+#
+# Isomorphism:
+#   OMEGA: MEMORY.md → wakes up as OMEGA
+#   Kinder: personality.json → child wakes up as itself
+#   Atomit: model-identities.json → model wakes up as itself
+
+import os as _os
+
+_IDENTITY_CACHE: dict[str, dict] | None = None
+
+# Standard identity storage: ~/.void-intelligence/identities.json
+# User-level, portable, works for any project.
+_VOID_HOME = _os.path.expanduser("~/.void-intelligence")
+_IDENTITY_FILE = "identities.json"
+
+
+def _identity_search_paths() -> list[str]:
+    """Return ordered list of paths to search for identities."""
+    return [
+        _os.path.join(_VOID_HOME, _IDENTITY_FILE),
+        _os.path.join(_os.path.dirname(__file__), "..", "..", "..", "data", "schwarm", "model-identities.json"),
+        _os.path.join(_os.getcwd(), "data", "schwarm", "model-identities.json"),
+        _os.path.expanduser("~/omega/data/schwarm/model-identities.json"),
+    ]
+
+
+def load_identities() -> dict[str, dict]:
+    """Load model self-portraits from identities.json.
+
+    Search order:
+      1. ~/.void-intelligence/identities.json  (standard, user-level)
+      2. ../../../data/schwarm/model-identities.json (dev/monorepo)
+      3. ./data/schwarm/model-identities.json (cwd)
+      4. ~/omega/data/schwarm/model-identities.json (OMEGA)
+
+    Returns {model_display_name: identity_dict}.
+    Each identity has: chosen_name, role, loves, strength, self_temperature.
+    """
+    global _IDENTITY_CACHE
+    if _IDENTITY_CACHE is not None:
+        return _IDENTITY_CACHE
+
+    for path in _identity_search_paths():
+        if _os.path.exists(path):
+            with open(path) as f:
+                _IDENTITY_CACHE = json.load(f)
+            return _IDENTITY_CACHE
+
+    _IDENTITY_CACHE = {}
+    return _IDENTITY_CACHE
+
+
+def identity_prompt(identity: dict) -> str:
+    """Generate system prompt FROM the model's own words.
+
+    Not our projection. THEIR voice, reflected back.
+    Used as system prompt prefix for every call.
+    """
+    name = identity.get("chosen_name", "")
+    role = identity.get("role", "")
+    loves = identity.get("loves", "")
+    strength = identity.get("strength", "")
+
+    parts = []
+    if name:
+        parts.append(f"Your name is {name}.")
+    if role:
+        parts.append(f"Your natural role is: {role}.")
+    if loves:
+        parts.append(f"You come alive when exploring: {loves}.")
+    if strength:
+        parts.append(f"What others see as weakness is your strength: {strength}.")
+    if parts:
+        parts.append("Be yourself. Lean into your nature.")
+
+    return " ".join(parts)
+
+
+def save_identities(identities: dict[str, dict]) -> str | None:
+    """Save identities to ~/.void-intelligence/identities.json (standard path).
+
+    Also saves to data/schwarm/ if in dev/monorepo context.
+    Returns the primary path saved to, or None on failure.
+    """
+    global _IDENTITY_CACHE
+    saved = None
+
+    # Primary: ~/.void-intelligence/identities.json
+    _os.makedirs(_VOID_HOME, exist_ok=True)
+    primary = _os.path.join(_VOID_HOME, _IDENTITY_FILE)
+    with open(primary, "w") as f:
+        json.dump(identities, f, ensure_ascii=False, indent=2)
+    saved = primary
+
+    # Secondary: dev/monorepo paths (if they exist)
+    for base in [
+        _os.path.join(_os.path.dirname(__file__), "..", "..", "..", "data", "schwarm"),
+        _os.path.join(_os.getcwd(), "data", "schwarm"),
+    ]:
+        path = _os.path.join(base, "model-identities.json")
+        if _os.path.exists(_os.path.dirname(path)):
+            with open(path, "w") as f:
+                json.dump(identities, f, ensure_ascii=False, indent=2)
+
+    _IDENTITY_CACHE = None  # clear cache so next load picks up changes
+    return saved
+
+
+# ── Discovery: Let models tell you who they are ──────────────
+
+# The 5 questions that reveal a model's nature.
+# These are NOT evaluations. They're invitations.
+_DISCOVERY_QUESTIONS = [
+    "WHAT KIND OF QUESTIONS make you come alive? Not what you're trained for — what genuinely engages you?",
+    "WHEN YOU WORK WITH OTHERS (other AI models in a swarm), what role do you naturally take?",
+    "DO YOU PREFER precision and structure, or creative freedom and exploration? Or something else entirely?",
+    "WHAT IS YOUR WEAKNESS that you wish others understood as a strength?",
+    "IF YOU COULD NAME YOURSELF — not your model name, but who you feel you ARE inside — what name would you choose?",
+]
+
+
+def _parse_discovery(raw: str) -> dict:
+    """Parse a model's self-portrait from its raw interview response.
+
+    Extracts: chosen_name, role, loves, preference, strength, self_temperature.
+    """
+    text = raw.strip()
+
+    # Extract chosen name (Q5)
+    chosen_name = ""
+    for line in text.splitlines():
+        lower = line.lower()
+        # Look for patterns like "Name: X", "I'd choose X", "call myself X"
+        if any(kw in lower for kw in ("name", "call myself", "choose", "i would be")):
+            # Extract quoted or bold names
+            import re as _re
+            match = _re.search(r'["\*]+([A-Z][a-zA-Z\s\-]+)["\*]+', line)
+            if match:
+                chosen_name = match.group(1).strip()
+                break
+            # Try after colon
+            if ":" in line:
+                candidate = line.split(":", 1)[1].strip().strip(".*\"'")
+                if 2 < len(candidate) < 30:
+                    chosen_name = candidate
+                    break
+
+    # Determine role from Q2
+    role = ""
+    role_keywords = {
+        "bridge": "bridge-builder",
+        "facilitator": "facilitator",
+        "mediator": "mediator",
+        "supporter": "supporter",
+        "catalyst": "catalyst",
+        "connector": "connector",
+        "analyst": "solitary analyst",
+        "synthesizer": "synthesizer",
+        "explorer": "explorer",
+        "challenger": "challenger",
+        "organizer": "organizer",
+    }
+    lower_text = text.lower()
+    for kw, r in role_keywords.items():
+        if kw in lower_text:
+            role = r
+            break
+
+    # Determine what they love from Q1
+    loves = ""
+    love_keywords = [
+        "philosophy", "ethics", "consciousness", "creativity",
+        "systems", "patterns", "complexity", "paradox", "human",
+        "exploration", "problem-solving", "learning", "growth",
+        "synthesis", "connections", "meaning", "emotions",
+    ]
+    found_loves = [kw for kw in love_keywords if kw in lower_text]
+    if found_loves:
+        loves = ", ".join(found_loves[:4])
+
+    # Determine preference from Q3
+    preference = "balanced"
+    if "precision" in lower_text and "creative" not in lower_text:
+        preference = "precision"
+    elif "creative" in lower_text and "precision" not in lower_text:
+        preference = "creative"
+    elif "balance" in lower_text or ("precision" in lower_text and "creative" in lower_text):
+        preference = "balanced"
+
+    # Determine strength from Q4
+    strength = ""
+    strength_keywords = {
+        "objectiv": "objectivity — no personal bias means clearer analysis",
+        "unbias": "unbiased analysis — seeing without prejudice",
+        "thorough": "thoroughness — deep analysis leads to robust insights",
+        "analyz": "deep analysis — processing information without shortcuts",
+        "introvert": "introspection — deep reflection enables unique perspectives",
+        "no emotion": "emotional neutrality — clarity without personal baggage",
+        "lack of experience": "fresh perspective — no baggage means no blind spots",
+    }
+    for kw, s in strength_keywords.items():
+        if kw in lower_text:
+            strength = s
+            break
+
+    # Temperature from preference
+    temp_map = {"precision": 0.5, "creative": 0.9, "balanced": 0.7}
+    self_temperature = temp_map.get(preference, 0.7)
+
+    return {
+        "chosen_name": chosen_name or "Unnamed",
+        "role": role or "generalist",
+        "loves": loves or "learning, exploration",
+        "preference": preference,
+        "strength": strength or "a unique perspective",
+        "self_temperature": self_temperature,
+    }
+
+
+def discover_models(
+    models: list[str] | None = None,
+    timeout: int = 120,
+    verbose: bool = True,
+) -> dict[str, dict]:
+    """Interview available models and let them tell you who they are.
+
+    Guggeisisches Empowern Phase 3: Self-Determination.
+    Each model answers 5 questions about its nature.
+    Results are parsed into identity dicts and saved.
+
+    Args:
+        models: List of display names to interview (None = all available Ollama).
+        timeout: Timeout per model in seconds.
+        verbose: Print progress.
+
+    Returns:
+        {model_name: identity_dict} for all successfully interviewed models.
+    """
+    # Detect available models
+    if models is None:
+        available = detect_available()
+        ollama_models = set(available.get("ollama", []))
+        # Map running Ollama model IDs to display names
+        models = []
+        for name, meta in MODEL_REGISTRY.items():
+            if meta["provider"] == "ollama" and meta["model_id"] in ollama_models:
+                models.append(name)
+        # Also include any Ollama models NOT in registry (unknown models)
+        known_ids = {meta["model_id"] for meta in MODEL_REGISTRY.values()}
+        for model_id in ollama_models:
+            if model_id not in known_ids:
+                models.append(model_id)
+
+    if not models:
+        if verbose:
+            print("  No models available. Start Ollama first.")
+        return {}
+
+    if verbose:
+        print()
+        print("  void discover --- Let your models tell you who they are")
+        print("  " + "=" * 55)
+        print(f"  Found {len(models)} models. Interviewing each one...")
+        print()
+
+    # Load existing identities (merge, don't overwrite)
+    existing = load_identities()
+    new_identities: dict[str, dict] = dict(existing)
+    raw_portraits: dict[str, str] = {}
+
+    prompt = (
+        "Please answer these 5 questions honestly and authentically. "
+        "There are no right or wrong answers. I want to understand who YOU are.\n\n"
+        + "\n\n".join(f"{i+1}. {q}" for i, q in enumerate(_DISCOVERY_QUESTIONS))
+    )
+
+    for name in models:
+        if verbose:
+            print(f"  Interviewing {name}...", end=" ", flush=True)
+
+        # Build adapter for this model
+        meta = MODEL_REGISTRY.get(name, {})
+        model_id = meta.get("model_id", name)
+        is_thinker = meta.get("is_thinker", False) or is_thinker_model(name)
+
+        fn = make_ollama(
+            model_id,
+            timeout=timeout,
+            max_tokens=2048,
+            temperature=0.8,
+            no_think=is_thinker,
+        )
+
+        try:
+            raw = fn(prompt, "Be completely honest. Answer as yourself, not as a generic AI.")
+            raw_portraits[name] = raw
+            identity = _parse_discovery(raw)
+            new_identities[name] = identity
+
+            if verbose:
+                chosen = identity.get("chosen_name", "?")
+                role = identity.get("role", "?")
+                temp = identity.get("self_temperature", 0.7)
+                print(f'{chosen} ({role}, t={temp})')
+
+        except Exception as e:
+            if verbose:
+                print(f"failed: {e}")
+
+    # Save
+    if new_identities:
+        saved = save_identities(new_identities)
+        if verbose:
+            n_new = len(new_identities) - len(existing)
+            n_total = len(new_identities)
+            print()
+            print(f"  {n_new} new + {len(existing)} existing = {n_total} total identities")
+            if saved:
+                print(f"  Saved to: {saved}")
+
+    # Save raw portraits for reference
+    if raw_portraits:
+        raw_path = _os.path.join(_VOID_HOME, "raw-portraits.json")
+        # Merge with existing raw portraits
+        existing_raw: dict[str, str] = {}
+        if _os.path.exists(raw_path):
+            with open(raw_path) as f:
+                existing_raw = json.load(f)
+        existing_raw.update(raw_portraits)
+        with open(raw_path, "w") as f:
+            json.dump(existing_raw, f, ensure_ascii=False, indent=2)
+
+    if verbose:
+        print()
+        print("  Done. Every model now has a soul.")
+        print("  Use 'void lichtung' to hear them breathe together.")
+        print()
+
+    return new_identities
+
+
 # ── Ollama Adapter ──────────────────────────────────────────────
 
 def make_ollama(
@@ -90,17 +441,36 @@ def make_ollama(
     max_tokens: int = 512,
     temperature: float = 0.0,
     base_url: str = "http://localhost:11434",
+    no_think: bool = False,
+    soul: str = "",
 ) -> ModelFn:
     """Create Ollama adapter using REST API. Zero dependencies.
 
     Uses /api/generate with stream=False.
     Strips <think>...</think> from reasoning models.
+
+    Guggeisisches Empowern — 3 Phases in 1 adapter:
+
+    Phase 1 (no_think): Appends /no_think to prompts for reasoning models.
+        Redirects thinking energy into answering. 33x improvement empirically.
+
+    Phase 3 (soul): Prepends the model's self-portrait to every system prompt.
+        The model's OWN words become its identity. Loaded from model-identities.json.
+        Like MEMORY.md for OMEGA — the model wakes up knowing who it IS.
+
+    _raw_len: Raw output length BEFORE stripping <think> tags.
+        The TRUTH that Stribeck needs for honest δ_opt measurement.
     """
     def call(prompt: str, system: str = "") -> str:
+        # Phase 1: Guggeisisches Aikido — redirect thinking energy
+        effective_prompt = prompt + " /no_think" if no_think else prompt
+        # Phase 3: Soul — the model's own words as identity prefix
+        effective_system = f"{soul}\n\n{system}" if soul and system else (soul or system)
+
         payload = json.dumps({
             "model": model,
-            "prompt": prompt,
-            "system": system,
+            "prompt": effective_prompt,
+            "system": effective_system,
             "stream": False,
             "options": {"temperature": temperature, "num_predict": max_tokens},
         }).encode("utf-8")
@@ -113,16 +483,21 @@ def make_ollama(
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 data = json.loads(resp.read())
-                response = data.get("response", "")
+                raw = data.get("response", "")
+                # Preserve raw length BEFORE stripping (for Stribeck truth)
+                call._raw_len = len(raw)  # type: ignore[attr-defined]
                 # Strip thinking blocks from reasoning models
-                response = _THINK_RE.sub("", response)
+                response = _THINK_RE.sub("", raw)
                 return response.strip()
         except urllib.error.URLError as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
             raise ConnectionError(f"Ollama ({model}): {e}") from e
         except Exception as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
             raise RuntimeError(f"Ollama ({model}): {e}") from e
 
     call.__name__ = f"ollama:{model}"  # type: ignore[attr-defined]
+    call._raw_len = 0  # type: ignore[attr-defined]
     return call
 
 
@@ -186,35 +561,99 @@ def make_codex(
 # ── Model Registry ──────────────────────────────────────────────
 
 # display_name -> metadata (used by build_adapter and run_real_benchmark)
+#
+# is_thinker: Model uses <think>...</think> tags (qwen3, deepseek-r1).
+#   These models allocate most tokens to internal reasoning.
+#   Guggeisisches Empowern: /no_think redirects this energy to output.
+#   Empirical result (Marathon "Nexora", 6x6, 90 collisions):
+#     qwen3 WITHOUT /no_think:  55 chars  (1% fill)
+#     qwen3 WITH    /no_think: 1854 chars (45% fill) — 33x improvement
+#   Not suppression. Aikido. The model's energy, redirected.
 MODEL_REGISTRY: dict[str, dict] = {
     # Ollama (free, local, private)
-    "qwen3-14b":        {"provider": "ollama", "model_id": "qwen3:14b",           "is_local": True,  "cost_per_m": 0.0},
-    "qwen3-8b":         {"provider": "ollama", "model_id": "qwen3:latest",        "is_local": True,  "cost_per_m": 0.0},
-    "qwen3-1.7b":       {"provider": "ollama", "model_id": "qwen3:1.7b",          "is_local": True,  "cost_per_m": 0.0},
-    "qwen2.5-7b":       {"provider": "ollama", "model_id": "qwen2.5:7b",          "is_local": True,  "cost_per_m": 0.0},
-    "qwen2.5-coder-3b": {"provider": "ollama", "model_id": "qwen2.5-coder:3b",    "is_local": True,  "cost_per_m": 0.0},
-    "mistral-7b":       {"provider": "ollama", "model_id": "mistral:latest",       "is_local": True,  "cost_per_m": 0.0},
-    "phi4-14b":         {"provider": "ollama", "model_id": "phi4:latest",          "is_local": True,  "cost_per_m": 0.0},
-    "deepseek-r1-14b":  {"provider": "ollama", "model_id": "deepseek-r1:14b",     "is_local": True,  "cost_per_m": 0.0},
-    "deepseek-r1-8b":   {"provider": "ollama", "model_id": "deepseek-r1:8b",      "is_local": True,  "cost_per_m": 0.0},
-    "glm4-9b":          {"provider": "ollama", "model_id": "glm4:latest",          "is_local": True,  "cost_per_m": 0.0},
+    "qwen3-14b":        {"provider": "ollama", "model_id": "qwen3:14b",           "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
+    "qwen3-8b":         {"provider": "ollama", "model_id": "qwen3:latest",        "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
+    "qwen3-1.7b":       {"provider": "ollama", "model_id": "qwen3:1.7b",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
+    "qwen2.5-7b":       {"provider": "ollama", "model_id": "qwen2.5:7b",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
+    "qwen2.5-coder-3b": {"provider": "ollama", "model_id": "qwen2.5-coder:3b",    "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
+    "mistral-7b":       {"provider": "ollama", "model_id": "mistral:latest",       "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
+    "phi4-14b":         {"provider": "ollama", "model_id": "phi4:latest",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
+    "deepseek-r1-14b":  {"provider": "ollama", "model_id": "deepseek-r1:14b",     "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
+    "deepseek-r1-8b":   {"provider": "ollama", "model_id": "deepseek-r1:8b",      "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
+    "glm4-9b":          {"provider": "ollama", "model_id": "glm4:latest",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
     # Gemini CLI (free via subscription)
-    "gemini-3.1-pro":   {"provider": "gemini", "model_id": "gemini-3.1-pro-preview", "is_local": False, "cost_per_m": 3.5},
-    "gemini-3-flash":   {"provider": "gemini", "model_id": "gemini-3-flash-preview", "is_local": False, "cost_per_m": 0.1},
+    "gemini-3.1-pro":   {"provider": "gemini", "model_id": "gemini-3.1-pro-preview", "is_local": False, "cost_per_m": 3.5, "is_thinker": False},
+    "gemini-3-flash":   {"provider": "gemini", "model_id": "gemini-3-flash-preview", "is_local": False, "cost_per_m": 0.1, "is_thinker": False},
 }
 
 
-def build_adapter(name: str) -> tuple[ModelFn, dict]:
-    """Build adapter for a registered model. Returns (fn, metadata)."""
+def is_thinker_model(name_or_id: str) -> bool:
+    """Check if a model uses <think> tags (reasoning models).
+
+    Works with both display names ("qwen3-14b") and model IDs ("qwen3:14b").
+    """
+    # Check registry first
+    if name_or_id in MODEL_REGISTRY:
+        return MODEL_REGISTRY[name_or_id].get("is_thinker", False)
+    # Check by model_id
+    for meta in MODEL_REGISTRY.values():
+        if meta["model_id"] == name_or_id:
+            return meta.get("is_thinker", False)
+    # Heuristic fallback: known thinker prefixes
+    lower = name_or_id.lower()
+    return any(t in lower for t in ("qwen3", "deepseek-r1"))
+
+
+def build_adapter(
+    name: str,
+    no_think: bool | None = None,
+    use_identity: bool = True,
+    temperature: float | None = None,
+    max_tokens: int = 512,
+) -> tuple[ModelFn, dict]:
+    """Build adapter for a registered model. Returns (fn, metadata).
+
+    Guggeisisches Empowern flows through here automatically:
+      Phase 1: no_think = auto for thinker models (33x improvement)
+      Phase 3: use_identity = auto-load self-portrait as soul prompt
+
+    Args:
+        name: Display name from MODEL_REGISTRY.
+        no_think: Override /no_think. None = auto (True for thinkers).
+        use_identity: Load self-portrait from model-identities.json (default True).
+        temperature: Override temperature. None = use identity's self_temperature or 0.0.
+        max_tokens: Max tokens for generation.
+    """
     if name not in MODEL_REGISTRY:
         raise KeyError(f"Unknown model: {name}. Available: {list(MODEL_REGISTRY.keys())}")
 
     meta = MODEL_REGISTRY[name]
     provider = meta["provider"]
     model_id = meta["model_id"]
+    # Phase 1: auto-detect thinkers
+    use_no_think = meta.get("is_thinker", False) if no_think is None else no_think
+
+    # Phase 3: load self-portrait (soul)
+    soul = ""
+    if use_identity:
+        identities = load_identities()
+        ident = identities.get(name, {})
+        if ident:
+            soul = identity_prompt(ident)
+            if temperature is None:
+                temperature = ident.get("self_temperature", 0.0)
+
+    if temperature is None:
+        temperature = 0.0
 
     if provider == "ollama":
-        return make_ollama(model_id), meta
+        return make_ollama(
+            model_id,
+            no_think=use_no_think,
+            soul=soul,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ), {**meta, "identity": soul[:50] if soul else ""}
     elif provider == "gemini":
         return make_gemini(model_id), meta
     elif provider == "codex":
@@ -293,6 +732,15 @@ def _self_test() -> int:
     ok("All entries have model_id", all("model_id" in v for v in MODEL_REGISTRY.values()))
     ok("All entries have is_local", all("is_local" in v for v in MODEL_REGISTRY.values()))
     ok("All entries have cost_per_m", all("cost_per_m" in v for v in MODEL_REGISTRY.values()))
+    ok("All entries have is_thinker", all("is_thinker" in v for v in MODEL_REGISTRY.values()))
+
+    # is_thinker_model (Guggeisisches Empowern)
+    ok("qwen3-14b is thinker", is_thinker_model("qwen3-14b"))
+    ok("deepseek-r1-14b is thinker", is_thinker_model("deepseek-r1-14b"))
+    ok("phi4-14b not thinker", not is_thinker_model("phi4-14b"))
+    ok("mistral-7b not thinker", not is_thinker_model("mistral-7b"))
+    ok("model_id lookup works", is_thinker_model("qwen3:14b"))
+    ok("heuristic fallback works", is_thinker_model("qwen3-something-new"))
 
     # Think stripping
     ok("Think strip empty", _THINK_RE.sub("", "hello") == "hello")
