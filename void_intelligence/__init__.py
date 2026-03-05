@@ -213,6 +213,13 @@ from void_intelligence.adapters import (
     make_ollama,
     make_gemini,
     make_codex,
+    make_openai,
+    make_openai_api,
+    make_anthropic,
+    make_groq,
+    make_together,
+    make_openrouter,
+    make_mistral_api,
     detect_available,
     build_adapter,
     build_available_adapters,
@@ -230,7 +237,7 @@ from void_intelligence.lichtung import (
     VoidSchwarm,
 )
 
-__version__ = "2.0.0"
+__version__ = "2.3.0"
 
 __all__ = [
     # IR Types
@@ -297,6 +304,8 @@ __all__ = [
     "StribeckHexagon", "FrictionAxis", "DELTA_OPT",
     # Adapters (v2.1.0) — zero-dep model adapters
     "make_ollama", "make_gemini", "make_codex",
+    "make_openai", "make_openai_api", "make_anthropic",
+    "make_groq", "make_together", "make_openrouter", "make_mistral_api",
     "detect_available", "build_adapter", "build_available_adapters",
     "is_thinker_model", "MODEL_REGISTRY",
     # Identity / Discovery (v2.2.0) — Guggeisisches Empowern

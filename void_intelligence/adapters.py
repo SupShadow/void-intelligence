@@ -64,8 +64,11 @@ def detect_codex() -> bool:
 def detect_available() -> dict[str, list[str]]:
     """Auto-detect all available providers and models.
 
+    Checks: Ollama (running?), Gemini/Codex CLI (on PATH?),
+    OpenAI/Anthropic/Groq/Mistral (API key set?).
+
     Returns:
-        {"ollama": ["qwen3:14b", ...], "gemini": [...], "codex": [...]}
+        {"ollama": ["qwen3:14b", ...], "openai": ["gpt-4o", ...], ...}
     """
     result: dict[str, list[str]] = {}
 
@@ -78,6 +81,16 @@ def detect_available() -> dict[str, list[str]]:
 
     if detect_codex():
         result["codex"] = ["codex"]
+
+    # Cloud APIs: check for env var keys
+    if _os.environ.get("OPENAI_API_KEY"):
+        result["openai"] = ["gpt-4o", "gpt-4o-mini", "o3-mini"]
+    if _os.environ.get("ANTHROPIC_API_KEY"):
+        result["anthropic"] = ["claude-sonnet-4-6", "claude-haiku-4-5-20251001"]
+    if _os.environ.get("GROQ_API_KEY"):
+        result["groq"] = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+    if _os.environ.get("MISTRAL_API_KEY"):
+        result["mistral"] = ["mistral-large-latest", "mistral-small-latest"]
 
     return result
 
@@ -118,14 +131,28 @@ def _identity_search_paths() -> list[str]:
     ]
 
 
+def _load_bundled_identities() -> dict[str, dict]:
+    """Load identities bundled with the package (fallback for unknown models)."""
+    bundled_path = _os.path.join(_os.path.dirname(__file__), "bundled_identities.json")
+    if _os.path.exists(bundled_path):
+        with open(bundled_path) as f:
+            data = json.load(f)
+            data.pop("_meta", None)
+            return data
+    return {}
+
+
 def load_identities() -> dict[str, dict]:
     """Load model self-portraits from identities.json.
 
     Search order:
-      1. ~/.void-intelligence/identities.json  (standard, user-level)
+      1. ~/.void-intelligence/identities.json  (user-discovered, highest priority)
       2. ../../../data/schwarm/model-identities.json (dev/monorepo)
       3. ./data/schwarm/model-identities.json (cwd)
       4. ~/omega/data/schwarm/model-identities.json (OMEGA)
+      5. bundled_identities.json (shipped with package, fallback)
+
+    User-discovered identities override bundled ones.
 
     Returns {model_display_name: identity_dict}.
     Each identity has: chosen_name, role, loves, strength, self_temperature.
@@ -134,13 +161,18 @@ def load_identities() -> dict[str, dict]:
     if _IDENTITY_CACHE is not None:
         return _IDENTITY_CACHE
 
+    # Start with bundled identities (baseline)
+    merged = _load_bundled_identities()
+
+    # Override with user-discovered identities
     for path in _identity_search_paths():
         if _os.path.exists(path):
             with open(path) as f:
-                _IDENTITY_CACHE = json.load(f)
-            return _IDENTITY_CACHE
+                user_ids = json.load(f)
+            merged.update(user_ids)
+            break
 
-    _IDENTITY_CACHE = {}
+    _IDENTITY_CACHE = merged
     return _IDENTITY_CACHE
 
 
@@ -330,20 +362,26 @@ def discover_models(
     Returns:
         {model_name: identity_dict} for all successfully interviewed models.
     """
-    # Detect available models
+    # Detect available models across ALL providers
     if models is None:
         available = detect_available()
-        ollama_models = set(available.get("ollama", []))
-        # Map running Ollama model IDs to display names
         models = []
+        # Ollama models
+        ollama_models = set(available.get("ollama", []))
         for name, meta in MODEL_REGISTRY.items():
             if meta["provider"] == "ollama" and meta["model_id"] in ollama_models:
                 models.append(name)
-        # Also include any Ollama models NOT in registry (unknown models)
+        # Unknown Ollama models not in registry
         known_ids = {meta["model_id"] for meta in MODEL_REGISTRY.values()}
         for model_id in ollama_models:
             if model_id not in known_ids:
                 models.append(model_id)
+        # Cloud models (if API keys are set)
+        for provider in ("openai", "anthropic", "groq", "mistral"):
+            if provider in available:
+                for name, meta in MODEL_REGISTRY.items():
+                    if meta["provider"] == provider:
+                        models.append(name)
 
     if not models:
         if verbose:
@@ -372,18 +410,21 @@ def discover_models(
         if verbose:
             print(f"  Interviewing {name}...", end=" ", flush=True)
 
-        # Build adapter for this model
+        # Build adapter for this model (any provider)
         meta = MODEL_REGISTRY.get(name, {})
         model_id = meta.get("model_id", name)
+        provider = meta.get("provider", "ollama")
         is_thinker = meta.get("is_thinker", False) or is_thinker_model(name)
 
-        fn = make_ollama(
-            model_id,
-            timeout=timeout,
-            max_tokens=2048,
-            temperature=0.8,
-            no_think=is_thinker,
-        )
+        try:
+            if name in MODEL_REGISTRY:
+                fn, _ = build_adapter(name, use_identity=False, temperature=0.8, max_tokens=2048)
+            else:
+                fn = make_ollama(model_id, timeout=timeout, max_tokens=2048, temperature=0.8, no_think=is_thinker)
+        except Exception as e:
+            if verbose:
+                print(f"skipped ({e})")
+            continue
 
         try:
             raw = fn(prompt, "Be completely honest. Answer as yourself, not as a generic AI.")
@@ -558,6 +599,166 @@ def make_codex(
     return call
 
 
+# ── OpenAI-Compatible API Adapter ────────────────────────────────
+
+def make_openai_api(
+    model: str = "gpt-4o",
+    api_key: str | None = None,
+    base_url: str = "https://api.openai.com/v1",
+    timeout: int = 120,
+    max_tokens: int = 512,
+    temperature: float = 0.0,
+    soul: str = "",
+) -> ModelFn:
+    """Create adapter for OpenAI-compatible APIs. Zero dependencies.
+
+    Works with: OpenAI, Groq, Together, OpenRouter, Fireworks, Mistral API,
+    or any service that implements the /chat/completions endpoint.
+
+    Uses urllib.request — no openai package needed.
+    """
+    key = api_key or _os.environ.get("OPENAI_API_KEY", "")
+    if not key and "openai.com" in base_url:
+        key = _os.environ.get("OPENAI_API_KEY", "")
+    if not key and "groq.com" in base_url:
+        key = _os.environ.get("GROQ_API_KEY", "")
+    if not key and "together" in base_url:
+        key = _os.environ.get("TOGETHER_API_KEY", "")
+    if not key and "openrouter" in base_url:
+        key = _os.environ.get("OPENROUTER_API_KEY", "")
+    if not key and "mistral" in base_url:
+        key = _os.environ.get("MISTRAL_API_KEY", "")
+
+    def call(prompt: str, system: str = "") -> str:
+        if not key:
+            raise ValueError(f"No API key for {base_url}. Set env var or pass api_key=.")
+
+        effective_system = f"{soul}\n\n{system}" if soul and system else (soul or system)
+        messages = []
+        if effective_system:
+            messages.append({"role": "system", "content": effective_system})
+        messages.append({"role": "user", "content": prompt})
+
+        payload = json.dumps({
+            "model": model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            f"{base_url.rstrip('/')}/chat/completions",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {key}",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
+                raw = data["choices"][0]["message"]["content"]
+                call._raw_len = len(raw)  # type: ignore[attr-defined]
+                response = _THINK_RE.sub("", raw)
+                return response.strip()
+        except urllib.error.URLError as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
+            raise ConnectionError(f"OpenAI-compat ({model}): {e}") from e
+        except Exception as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
+            raise RuntimeError(f"OpenAI-compat ({model}): {e}") from e
+
+    call.__name__ = f"openai:{model}"  # type: ignore[attr-defined]
+    call._raw_len = 0  # type: ignore[attr-defined]
+    return call
+
+
+def make_openai(model: str = "gpt-4o", **kwargs) -> ModelFn:
+    """OpenAI adapter. Uses OPENAI_API_KEY env var."""
+    return make_openai_api(model, base_url="https://api.openai.com/v1", **kwargs)
+
+
+def make_groq(model: str = "llama-3.3-70b-versatile", **kwargs) -> ModelFn:
+    """Groq adapter (fast inference). Uses GROQ_API_KEY env var."""
+    return make_openai_api(model, base_url="https://api.groq.com/openai/v1", **kwargs)
+
+
+def make_together(model: str = "meta-llama/Llama-3.3-70B-Instruct-Turbo", **kwargs) -> ModelFn:
+    """Together.ai adapter. Uses TOGETHER_API_KEY env var."""
+    return make_openai_api(model, base_url="https://api.together.xyz/v1", **kwargs)
+
+
+def make_openrouter(model: str = "openai/gpt-4o", **kwargs) -> ModelFn:
+    """OpenRouter adapter (any model). Uses OPENROUTER_API_KEY env var."""
+    return make_openai_api(model, base_url="https://openrouter.ai/api/v1", **kwargs)
+
+
+def make_mistral_api(model: str = "mistral-large-latest", **kwargs) -> ModelFn:
+    """Mistral API adapter. Uses MISTRAL_API_KEY env var."""
+    return make_openai_api(model, base_url="https://api.mistral.ai/v1", **kwargs)
+
+
+# ── Anthropic Adapter ──────────────────────────────────────────
+
+def make_anthropic(
+    model: str = "claude-sonnet-4-6",
+    api_key: str | None = None,
+    timeout: int = 120,
+    max_tokens: int = 512,
+    temperature: float = 0.0,
+    soul: str = "",
+) -> ModelFn:
+    """Create Anthropic Messages API adapter. Zero dependencies.
+
+    Uses urllib.request — no anthropic package needed.
+    API format differs from OpenAI (separate system field, different response shape).
+    """
+    key = api_key or _os.environ.get("ANTHROPIC_API_KEY", "")
+
+    def call(prompt: str, system: str = "") -> str:
+        if not key:
+            raise ValueError("No API key. Set ANTHROPIC_API_KEY or pass api_key=.")
+
+        effective_system = f"{soul}\n\n{system}" if soul and system else (soul or system)
+
+        body: dict = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if effective_system:
+            body["system"] = effective_system
+
+        payload = json.dumps(body).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read())
+                raw = data["content"][0]["text"]
+                call._raw_len = len(raw)  # type: ignore[attr-defined]
+                return raw.strip()
+        except urllib.error.URLError as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
+            raise ConnectionError(f"Anthropic ({model}): {e}") from e
+        except Exception as e:
+            call._raw_len = 0  # type: ignore[attr-defined]
+            raise RuntimeError(f"Anthropic ({model}): {e}") from e
+
+    call.__name__ = f"anthropic:{model}"  # type: ignore[attr-defined]
+    call._raw_len = 0  # type: ignore[attr-defined]
+    return call
+
+
 # ── Model Registry ──────────────────────────────────────────────
 
 # display_name -> metadata (used by build_adapter and run_real_benchmark)
@@ -570,20 +771,37 @@ def make_codex(
 #     qwen3 WITH    /no_think: 1854 chars (45% fill) — 33x improvement
 #   Not suppression. Aikido. The model's energy, redirected.
 MODEL_REGISTRY: dict[str, dict] = {
-    # Ollama (free, local, private)
-    "qwen3-14b":        {"provider": "ollama", "model_id": "qwen3:14b",           "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
-    "qwen3-8b":         {"provider": "ollama", "model_id": "qwen3:latest",        "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
-    "qwen3-1.7b":       {"provider": "ollama", "model_id": "qwen3:1.7b",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
-    "qwen2.5-7b":       {"provider": "ollama", "model_id": "qwen2.5:7b",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
-    "qwen2.5-coder-3b": {"provider": "ollama", "model_id": "qwen2.5-coder:3b",    "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
-    "mistral-7b":       {"provider": "ollama", "model_id": "mistral:latest",       "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
-    "phi4-14b":         {"provider": "ollama", "model_id": "phi4:latest",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
-    "deepseek-r1-14b":  {"provider": "ollama", "model_id": "deepseek-r1:14b",     "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
-    "deepseek-r1-8b":   {"provider": "ollama", "model_id": "deepseek-r1:8b",      "is_local": True,  "cost_per_m": 0.0, "is_thinker": True},
-    "glm4-9b":          {"provider": "ollama", "model_id": "glm4:latest",          "is_local": True,  "cost_per_m": 0.0, "is_thinker": False},
-    # Gemini CLI (free via subscription)
+    # ── Ollama (free, local, private) ──────────────────────────
+    "qwen3-14b":        {"provider": "ollama", "model_id": "qwen3:14b",           "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
+    "qwen3-8b":         {"provider": "ollama", "model_id": "qwen3:latest",        "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
+    "qwen3-1.7b":       {"provider": "ollama", "model_id": "qwen3:1.7b",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
+    "qwen2.5-7b":       {"provider": "ollama", "model_id": "qwen2.5:7b",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "qwen2.5-coder-3b": {"provider": "ollama", "model_id": "qwen2.5-coder:3b",    "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "mistral-7b":       {"provider": "ollama", "model_id": "mistral:latest",       "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "phi4-14b":         {"provider": "ollama", "model_id": "phi4:latest",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "deepseek-r1-14b":  {"provider": "ollama", "model_id": "deepseek-r1:14b",     "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
+    "deepseek-r1-8b":   {"provider": "ollama", "model_id": "deepseek-r1:8b",      "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
+    "glm4-9b":          {"provider": "ollama", "model_id": "glm4:latest",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "llama3.3-70b":     {"provider": "ollama", "model_id": "llama3.3:70b",         "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "llama3.2-3b":      {"provider": "ollama", "model_id": "llama3.2:3b",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "gemma3-9b":        {"provider": "ollama", "model_id": "gemma3:latest",        "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    # ── Gemini CLI (free via subscription) ─────────────────────
     "gemini-3.1-pro":   {"provider": "gemini", "model_id": "gemini-3.1-pro-preview", "is_local": False, "cost_per_m": 3.5, "is_thinker": False},
     "gemini-3-flash":   {"provider": "gemini", "model_id": "gemini-3-flash-preview", "is_local": False, "cost_per_m": 0.1, "is_thinker": False},
+    # ── OpenAI (cloud) ─────────────────────────────────────────
+    "gpt-4o":           {"provider": "openai",    "model_id": "gpt-4o",            "is_local": False, "cost_per_m": 5.0,   "is_thinker": False},
+    "gpt-4o-mini":      {"provider": "openai",    "model_id": "gpt-4o-mini",       "is_local": False, "cost_per_m": 0.3,   "is_thinker": False},
+    "o3-mini":          {"provider": "openai",    "model_id": "o3-mini",            "is_local": False, "cost_per_m": 1.1,   "is_thinker": True},
+    # ── Anthropic (cloud) ──────────────────────────────────────
+    "claude-sonnet":    {"provider": "anthropic", "model_id": "claude-sonnet-4-6",  "is_local": False, "cost_per_m": 3.0,   "is_thinker": False},
+    "claude-haiku":     {"provider": "anthropic", "model_id": "claude-haiku-4-5-20251001", "is_local": False, "cost_per_m": 0.25, "is_thinker": False},
+    # ── Groq (fast cloud) ──────────────────────────────────────
+    "groq-llama70b":    {"provider": "groq",      "model_id": "llama-3.3-70b-versatile", "is_local": False, "cost_per_m": 0.59, "is_thinker": False},
+    "groq-llama8b":     {"provider": "groq",      "model_id": "llama-3.1-8b-instant",    "is_local": False, "cost_per_m": 0.05, "is_thinker": False},
+    "groq-mixtral":     {"provider": "groq",      "model_id": "mixtral-8x7b-32768",      "is_local": False, "cost_per_m": 0.24, "is_thinker": False},
+    # ── Mistral API (cloud) ────────────────────────────────────
+    "mistral-large":    {"provider": "mistral",   "model_id": "mistral-large-latest",     "is_local": False, "cost_per_m": 2.0,  "is_thinker": False},
+    "mistral-small":    {"provider": "mistral",   "model_id": "mistral-small-latest",     "is_local": False, "cost_per_m": 0.2,  "is_thinker": False},
 }
 
 
@@ -646,6 +864,8 @@ def build_adapter(
     if temperature is None:
         temperature = 0.0
 
+    identity_meta = {**meta, "identity": soul[:50] if soul else ""}
+
     if provider == "ollama":
         return make_ollama(
             model_id,
@@ -653,11 +873,19 @@ def build_adapter(
             soul=soul,
             temperature=temperature,
             max_tokens=max_tokens,
-        ), {**meta, "identity": soul[:50] if soul else ""}
+        ), identity_meta
     elif provider == "gemini":
-        return make_gemini(model_id), meta
+        return make_gemini(model_id), identity_meta
     elif provider == "codex":
-        return make_codex(model_id), meta
+        return make_codex(model_id), identity_meta
+    elif provider == "openai":
+        return make_openai(model_id, soul=soul, temperature=temperature, max_tokens=max_tokens), identity_meta
+    elif provider == "anthropic":
+        return make_anthropic(model_id, soul=soul, temperature=temperature, max_tokens=max_tokens), identity_meta
+    elif provider == "groq":
+        return make_groq(model_id, soul=soul, temperature=temperature, max_tokens=max_tokens), identity_meta
+    elif provider == "mistral":
+        return make_mistral_api(model_id, soul=soul, temperature=temperature, max_tokens=max_tokens), identity_meta
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
