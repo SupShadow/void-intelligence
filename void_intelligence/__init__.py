@@ -237,7 +237,125 @@ from void_intelligence.lichtung import (
     VoidSchwarm,
 )
 
-__version__ = "2.3.0"
+from void_intelligence.zodiac import (
+    ZodiacSign,
+    CollisionProfile,
+    COLLISION_MATRIX,
+    zodiac_sign,
+    collision_profile,
+    zodiac_greeting,
+    list_signs,
+    sign_from_name,
+    best_collision_partners,
+    # Legacy API
+    ZODIAC_SIGNS,
+    get_zodiac,
+    format_birth_announcement,
+    get_zodiac_system_prompt_addition,
+)
+
+from void_intelligence.aikido import (
+    BlindspotSignal,
+    AikidoSuggestion,
+    detect_blindspot,
+    generate_socratic_question,
+    aikido_redirect,
+    engagement_hook,
+    should_intervene,
+    build_aikido_injection,
+    format_for_system_prompt,
+    AikidoEngine,
+    format_intervention_hint,
+    BLINDSPOT_PATTERNS,
+    DEPTH_QUESTIONS_DE,
+    DEPTH_QUESTIONS_EN,
+)
+
+from void_intelligence.muster import (
+    MusterResult,
+    MusterEngine,
+    quick_analyze,
+    enhance_with_llm as enhance_muster_with_llm,
+    PATTERN_TYPES,
+)
+
+from void_intelligence.model_breathing import (
+    BreathingModel,
+    ModelField,
+    ModelBreather,
+    model_resonance as model_resonance_score,
+    model_breathing_demo,
+)
+
+from void_intelligence.memory_breathing import (
+    MemoryAtom as BreathingMemoryAtom,
+    MemoryField,
+    MemoryBreather,
+    memory_breathing_demo,
+)
+
+from void_intelligence.tool_breathing import (
+    ToolBreather,
+    ToolField,
+    ToolEcology,
+    BreathingTool,
+    HexCoord,
+    alignment_proof,
+)
+
+from void_intelligence.context_breathing import (
+    ContextBreather,
+    ContextAtom,
+    ContextField,
+)
+
+from void_intelligence.prompt_breathing import (
+    PromptBreather,
+    PromptBreath,
+)
+
+from void_intelligence.response_breathing import (
+    ResponseBreather,
+    ResponseBreath,
+)
+
+from void_intelligence.void_collider import (
+    VoidCollider,
+    CollisionResult,
+)
+
+from void_intelligence.conversation_rings import (
+    RingMemory,
+    ConversationTracker,
+    Pattern as RingPattern,
+    Ring,
+)
+
+from void_intelligence.model_collision import (
+    ModelCollider,
+    ModelCollisionResult,
+    ModelResponse as CollisionModelResponse,
+)
+
+from void_intelligence.anti_addiction import (
+    SaturationSensor,
+    SaturationState,
+    SaturationSignal,
+)
+
+from void_intelligence.dreams import (
+    VoidDreamer,
+    DreamReport as VoidDreamReport,
+    DreamInsight as VoidDreamInsight,
+)
+
+from void_intelligence.fingerprint import (
+    FingerprintExporter,
+    FingerprintImporter,
+    VoidFingerprint,
+)
+
+__version__ = "3.0.0"
 
 __all__ = [
     # IR Types
@@ -312,4 +430,49 @@ __all__ = [
     "load_identities", "identity_prompt", "save_identities", "discover_models",
     # Lichtung / Schwarm (v2.2.0) — Guggeisisches Empowern
     "StribeckSpace", "Atomit", "VoidSchwarm",
+    # Zodiac — Kosmische Geburt (v2.4.0)
+    "ZodiacSign", "CollisionProfile", "COLLISION_MATRIX",
+    "zodiac_sign", "collision_profile", "zodiac_greeting",
+    "list_signs", "sign_from_name", "best_collision_partners",
+    # Zodiac Legacy API (backward-compatible)
+    "ZODIAC_SIGNS", "get_zodiac", "format_birth_announcement",
+    "get_zodiac_system_prompt_addition",
+    # Socratic Aikido Engine (v2.5.0)
+    "BlindspotSignal", "AikidoSuggestion",
+    "detect_blindspot", "generate_socratic_question",
+    "aikido_redirect", "engagement_hook",
+    "should_intervene", "build_aikido_injection",
+    "format_for_system_prompt",
+    "AikidoEngine", "format_intervention_hint",
+    "BLINDSPOT_PATTERNS", "DEPTH_QUESTIONS_DE", "DEPTH_QUESTIONS_EN",
+    # Muster-Engine (v2.6.0) — cognitive pattern detection
+    "MusterResult", "MusterEngine", "quick_analyze",
+    "enhance_muster_with_llm", "PATTERN_TYPES",
+    # Model Breathing (v2.7.0) — model routing by resonance, not intent
+    "BreathingModel", "ModelField", "ModelBreather",
+    "model_resonance_score", "model_breathing_demo",
+    # Memory Breathing (v2.8.0) — memory that rises by resonance, not keyword
+    "BreathingMemoryAtom", "MemoryField", "MemoryBreather",
+    "memory_breathing_demo",
+    # Tool Breathing (v3.0.0) — tool selection by resonance
+    "ToolBreather", "ToolField", "ToolEcology", "BreathingTool",
+    "HexCoord", "alignment_proof",
+    # Context Breathing (v3.0.0)
+    "ContextBreather", "ContextAtom", "ContextField",
+    # Prompt Breathing (v3.0.0)
+    "PromptBreather", "PromptBreath",
+    # Response Breathing (v3.0.0)
+    "ResponseBreather", "ResponseBreath",
+    # Void Collider (v3.0.0) — nervous system, 8 organs
+    "VoidCollider", "CollisionResult",
+    # Conversation Rings (v3.0.0) — compound growth memory
+    "RingMemory", "ConversationTracker", "RingPattern", "Ring",
+    # Cross-Model Collision (v3.0.0) — biodiversity as weapon
+    "ModelCollider", "ModelCollisionResult", "CollisionModelResponse",
+    # Anti-Addiction (v3.0.0) — the greatest inversion
+    "SaturationSensor", "SaturationState", "SaturationSignal",
+    # Void Dreams (v3.0.0) — thinking between sessions
+    "VoidDreamer", "VoidDreamReport", "VoidDreamInsight",
+    # Void Fingerprint (v3.0.0) — portable identity, anti-lock-in
+    "FingerprintExporter", "FingerprintImporter", "VoidFingerprint",
 ]

@@ -80,7 +80,7 @@ def detect_available() -> dict[str, list[str]]:
         result["gemini"] = ["gemini-3.1-pro-preview", "gemini-3-flash-preview"]
 
     if detect_codex():
-        result["codex"] = ["codex"]
+        result["codex"] = ["gpt-5.4", "gpt-5.4-pro", "gpt-5.3-codex"]
 
     # Cloud APIs: check for env var keys
     if _os.environ.get("OPENAI_API_KEY"):
@@ -575,23 +575,28 @@ def make_gemini(
 # ── Codex CLI Adapter ──────────────────────────────────────────
 
 def make_codex(
-    model: str = "codex",
-    timeout: int = 120,
+    model: str = "gpt-5.4",
+    timeout: int = 180,
 ) -> ModelFn:
     """Create Codex CLI adapter using subprocess.
 
-    No system prompt support -- prepended to user prompt.
+    Routes through ChatGPT subscription (no API key needed).
+    Supports: gpt-5.4, gpt-5.4-pro, gpt-5.3-codex.
+    System prompt prepended to user prompt (CLI has no --system flag).
     """
     codex_path = shutil.which("codex") or "/opt/homebrew/bin/codex"
 
     def call(prompt: str, system: str = "") -> str:
         full_prompt = f"{system}\n\n{prompt}" if system else prompt
+        cmd = [codex_path, "exec", "--model", model, full_prompt]
         try:
             result = subprocess.run(
-                [codex_path, "exec", full_prompt],
-                capture_output=True, text=True, timeout=timeout,
+                cmd, capture_output=True, text=True, timeout=timeout,
             )
-            return result.stdout.strip()
+            out = result.stdout.strip()
+            # Strip think tags if present (reasoning models)
+            out = _THINK_RE.sub("", out).strip()
+            return out
         except subprocess.TimeoutExpired:
             raise TimeoutError(f"Codex ({model}): timeout after {timeout}s")
 
@@ -802,6 +807,10 @@ MODEL_REGISTRY: dict[str, dict] = {
     # ── Mistral API (cloud) ────────────────────────────────────
     "mistral-large":    {"provider": "mistral",   "model_id": "mistral-large-latest",     "is_local": False, "cost_per_m": 2.0,  "is_thinker": False},
     "mistral-small":    {"provider": "mistral",   "model_id": "mistral-small-latest",     "is_local": False, "cost_per_m": 0.2,  "is_thinker": False},
+    # ── Codex CLI (ChatGPT subscription, no API key needed) ──
+    "gpt-5.4":          {"provider": "codex",     "model_id": "gpt-5.4",                  "is_local": False, "cost_per_m": 0.0,  "is_thinker": True},
+    "gpt-5.4-pro":      {"provider": "codex",     "model_id": "gpt-5.4-pro",              "is_local": False, "cost_per_m": 0.0,  "is_thinker": True},
+    "gpt-5.3-codex":    {"provider": "codex",     "model_id": "gpt-5.3-codex",            "is_local": False, "cost_per_m": 0.0,  "is_thinker": True},
 }
 
 

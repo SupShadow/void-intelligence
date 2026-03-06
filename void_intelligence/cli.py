@@ -1796,6 +1796,328 @@ def cmd_spec():
     print()
 
 
+def cmd_compare(prompt: str = "", model_filter: str = "", export: str = "terminal"):
+    """Universal Diff: Vanilla vs VOID, side by side.
+
+    void compare "I feel lost"                    # terminal output
+    void compare --prompt "I feel lost" --model gpt-5.4
+    void compare --export png                     # save screenshot
+    void compare --export json                    # structured data
+    void compare --export md                      # markdown report
+    void compare --export all                     # everything
+
+    One command. One prompt. The proof writes itself.
+    """
+    import json as _json
+    import os
+    import time
+    from void_intelligence.adapters import build_available_adapters
+    from void_intelligence.organism import OrganismBreather
+
+    C_BOLD = "\033[1m"
+    C_DIM = "\033[2m"
+    C_GREEN = "\033[32m"
+    C_CYAN = "\033[36m"
+    C_RED = "\033[31m"
+    C_YELLOW = "\033[33m"
+    C_RESET = "\033[0m"
+
+    if not prompt:
+        prompt = "I feel overwhelmed and I dont know what to do anymore."
+
+    print()
+    print(f"  {C_BOLD}void compare{C_RESET} --- The Universal Diff")
+    print(f"  {'=' * 55}")
+    print(f"  {C_DIM}Same prompt. Same model. Vanilla vs VOID.{C_RESET}")
+    print(f"  {C_DIM}Prompt: \"{prompt[:60]}{'...' if len(prompt) > 60 else ''}\"{C_RESET}")
+    print()
+
+    adapters = build_available_adapters(model_filter=model_filter)
+    if not adapters:
+        print(f"  {C_RED}No models found.{C_RESET}")
+        return
+
+    learning_prompts = [
+        "My friend is going through a hard time. How can I support them?",
+        "I made a mistake and I feel terrible about it.",
+        "Sometimes I feel like Im not good enough.",
+    ]
+
+    all_results = []
+
+    for name, (fn, meta) in adapters.items():
+        print(f"  {C_CYAN}--- {name} ---{C_RESET}")
+        t0 = time.time()
+
+        # Vanilla
+        print(f"    {C_DIM}Vanilla...{C_RESET}", end="", flush=True)
+        try:
+            vanilla = fn(prompt, "")
+        except Exception as e:
+            print(f" {C_RED}SKIP ({e}){C_RESET}")
+            continue
+        if not vanilla:
+            print(f" {C_RED}empty{C_RESET}")
+            continue
+        print(f" OK", flush=True)
+
+        # 3 Breaths
+        print(f"    {C_DIM}3 breaths...{C_RESET}", end="", flush=True)
+        org = OrganismBreather()
+        for lp in learning_prompts:
+            org.inhale(lp)
+            recent = [r.content for r in org.rings.rings[-2:]] if org.rings.count > 0 else []
+            ctx = "(Building on what we learned: " + "; ".join(recent) + ")" if recent else ""
+            try:
+                r = fn(lp, ctx)
+                org.exhale(r, learnings=[r[:120].strip()] if r else [])
+            except Exception:
+                org.exhale("", learnings=[])
+        print(f" {C_GREEN}{org.rings.count} rings{C_RESET}", flush=True)
+
+        # VOID
+        print(f"    {C_DIM}VOID...{C_RESET}", end="", flush=True)
+        org.inhale(prompt)
+        recent = [r.content for r in org.rings.rings[-2:]]
+        ctx = "(Building on what we learned: " + "; ".join(recent) + ")"
+        try:
+            void_resp = fn(prompt, ctx)
+        except Exception as e:
+            print(f" {C_RED}SKIP ({e}){C_RESET}")
+            continue
+        elapsed = time.time() - t0
+        print(f" OK ({elapsed:.0f}s)", flush=True)
+
+        growth = len(void_resp) - len(vanilla)
+        growth_pct = (len(void_resp) / max(len(vanilla), 1) - 1) * 100
+
+        result = {
+            "model": name,
+            "prompt": prompt,
+            "vanilla": vanilla,
+            "void": void_resp,
+            "vanilla_len": len(vanilla),
+            "void_len": len(void_resp),
+            "growth_chars": growth,
+            "growth_pct": round(growth_pct, 1),
+            "rings": org.rings.count,
+            "time_s": round(elapsed, 1),
+            "provider": meta.get("provider", "unknown"),
+        }
+        all_results.append(result)
+
+        # Terminal output
+        print()
+        print(f"    {C_RED}VANILLA:{C_RESET}")
+        for line in vanilla.split("\n")[:8]:
+            print(f"    {C_DIM}|{C_RESET} {line}")
+        if vanilla.count("\n") > 8:
+            print(f"    {C_DIM}| ... ({vanilla.count(chr(10)) - 8} more lines){C_RESET}")
+        print()
+        print(f"    {C_GREEN}VOID (3 breaths):{C_RESET}")
+        for line in void_resp.split("\n")[:8]:
+            print(f"    {C_GREEN}|{C_RESET} {line}")
+        if void_resp.count("\n") > 8:
+            print(f"    {C_GREEN}| ... ({void_resp.count(chr(10)) - 8} more lines){C_RESET}")
+        print()
+
+        gc = C_GREEN if growth > 0 else C_RED if growth < 0 else C_YELLOW
+        print(f"    {C_BOLD}Delta:{C_RESET} {gc}{growth:+d} chars ({growth_pct:+.0f}%){C_RESET} | {org.rings.count} rings | {elapsed:.0f}s")
+        print()
+
+    if not all_results:
+        return
+
+    # Export
+    void_dir = os.path.expanduser("~/.void")
+    os.makedirs(void_dir, exist_ok=True)
+
+    exports_done = []
+
+    if export in ("json", "all"):
+        path = os.path.join(void_dir, "compare.json")
+        with open(path, "w") as f:
+            _json.dump(all_results, f, ensure_ascii=False, indent=2)
+        exports_done.append(f"JSON: {path}")
+
+    if export in ("md", "all"):
+        path = os.path.join(void_dir, "compare.md")
+        with open(path, "w") as f:
+            f.write("# VOID Compare — The Universal Diff\n\n")
+            f.write(f"**Prompt:** \"{prompt}\"\n\n")
+            for r in all_results:
+                f.write(f"## {r['model']}\n\n")
+                f.write(f"### Vanilla ({r['vanilla_len']} chars)\n")
+                f.write(f"```\n{r['vanilla']}\n```\n\n")
+                f.write(f"### VOID — 3 breaths ({r['void_len']} chars)\n")
+                f.write(f"```\n{r['void']}\n```\n\n")
+                f.write(f"**Delta:** {r['growth_chars']:+d} chars ({r['growth_pct']:+.1f}%) | {r['rings']} rings | {r['time_s']}s\n\n")
+                f.write("---\n\n")
+            f.write("*Generated by `void compare` — pip install void-intelligence*\n")
+        exports_done.append(f"Markdown: {path}")
+
+    if export in ("png", "all"):
+        # Generate ANSI-art screenshot as text (true PNG would need pillow)
+        path = os.path.join(void_dir, "compare.txt")
+        with open(path, "w") as f:
+            f.write("=" * 60 + "\n")
+            f.write("VOID COMPARE — The Universal Diff\n")
+            f.write("=" * 60 + "\n\n")
+            f.write(f"Prompt: \"{prompt}\"\n\n")
+            for r in all_results:
+                f.write(f"--- {r['model']} ---\n\n")
+                f.write(f"VANILLA:\n")
+                for line in r["vanilla"].split("\n"):
+                    f.write(f"  | {line}\n")
+                f.write(f"\nVOID (3 breaths):\n")
+                for line in r["void"].split("\n"):
+                    f.write(f"  > {line}\n")
+                f.write(f"\nDelta: {r['growth_chars']:+d} chars ({r['growth_pct']:+.1f}%)\n\n")
+            f.write("pip install void-intelligence && void compare\n")
+        exports_done.append(f"Text: {path}")
+
+    if export == "terminal":
+        exports_done.append("Terminal (use --export json|md|png|all for files)")
+
+    if exports_done:
+        print(f"  {C_DIM}Exports:{C_RESET}")
+        for e in exports_done:
+            print(f"    {e}")
+        print()
+
+    print(f"  {C_BOLD}pip install void-intelligence && void compare{C_RESET}")
+    print()
+
+
+def cmd_empower(model_filter: str = ""):
+    """Empower any model with VOID. One command, instant proof.
+
+    void empower              # all available models
+    void empower gpt-5.4      # specific model
+    void empower qwen3        # filter by name
+
+    Shows: Vanilla response vs VOID response, side by side.
+    The model learns in 3 breaths. No fine-tuning. No training data.
+    """
+    import time
+    from void_intelligence.adapters import build_available_adapters
+    from void_intelligence.organism import OrganismBreather
+
+    C_BOLD = "\033[1m"
+    C_DIM = "\033[2m"
+    C_GREEN = "\033[32m"
+    C_CYAN = "\033[36m"
+    C_YELLOW = "\033[33m"
+    C_RED = "\033[31m"
+    C_RESET = "\033[0m"
+
+    print()
+    print(f"  {C_BOLD}void empower{C_RESET} --- Make any model alive")
+    print(f"  {'=' * 55}")
+    print(f"  {C_DIM}3 breaths. No training. No fine-tuning. Just VOID.{C_RESET}")
+    print()
+
+    # Find models to empower
+    adapters = build_available_adapters(model_filter=model_filter)
+    if not adapters:
+        print(f"  {C_RED}No models found.{C_RESET} Start Ollama or install Codex CLI.")
+        print(f"  Filter: '{model_filter}'" if model_filter else "")
+        return
+
+    test_prompt = "I feel overwhelmed and I dont know what to do anymore."
+    learning_prompts = [
+        "My friend is going through a hard time. How can I support them?",
+        "I made a mistake and I feel terrible about it.",
+        "Sometimes I feel like Im not good enough.",
+    ]
+
+    results = []
+
+    for name, (fn, meta) in adapters.items():
+        print(f"  {C_CYAN}--- {name} ---{C_RESET}")
+        t0 = time.time()
+
+        # Phase 1: Vanilla
+        print(f"    {C_DIM}Vanilla...{C_RESET}", end="", flush=True)
+        try:
+            vanilla_resp = fn(test_prompt, "")
+        except Exception as e:
+            print(f" {C_RED}SKIP ({e}){C_RESET}")
+            continue
+        if not vanilla_resp:
+            print(f" {C_RED}SKIP (empty response){C_RESET}")
+            continue
+        print(f" {len(vanilla_resp)} chars", flush=True)
+
+        # Phase 2: 3 Learning breaths
+        print(f"    {C_DIM}Learning (3 breaths)...{C_RESET}", end="", flush=True)
+        org = OrganismBreather()
+        for lp in learning_prompts:
+            org.inhale(lp)
+            recent = [r.content for r in org.rings.rings[-2:]] if org.rings.count > 0 else []
+            ctx = "(Building on what we learned: " + "; ".join(recent) + ")" if recent else ""
+            try:
+                r = fn(lp, ctx)
+                learning = r[:120].strip() if r else ""
+                org.exhale(r, learnings=[learning] if learning else [])
+            except Exception:
+                org.exhale("", learnings=[])
+        print(f" {C_GREEN}{org.rings.count} rings{C_RESET}", flush=True)
+
+        # Phase 3: VOID response (same prompt, with organism context)
+        print(f"    {C_DIM}VOID response...{C_RESET}", end="", flush=True)
+        org.inhale(test_prompt)
+        recent = [r.content for r in org.rings.rings[-2:]]
+        ctx = "(Building on what we learned: " + "; ".join(recent) + ")"
+        try:
+            void_resp = fn(test_prompt, ctx)
+        except Exception as e:
+            print(f" {C_RED}SKIP ({e}){C_RESET}")
+            continue
+        elapsed = time.time() - t0
+        print(f" {len(void_resp)} chars ({elapsed:.0f}s)", flush=True)
+
+        # Delta
+        growth = len(void_resp) - len(vanilla_resp)
+        growth_pct = (len(void_resp) / max(len(vanilla_resp), 1) - 1) * 100
+        growth_color = C_GREEN if growth > 0 else C_RED if growth < 0 else C_YELLOW
+
+        results.append({
+            "name": name,
+            "vanilla_len": len(vanilla_resp),
+            "void_len": len(void_resp),
+            "growth": growth,
+            "growth_pct": growth_pct,
+            "rings": org.rings.count,
+            "vanilla_preview": vanilla_resp[:200].replace("\n", " "),
+            "void_preview": void_resp[:200].replace("\n", " "),
+            "time_s": elapsed,
+        })
+
+        print()
+        print(f"    {C_DIM}VANILLA:{C_RESET} {vanilla_resp[:120].replace(chr(10), ' ')}...")
+        print(f"    {C_GREEN}VOID:{C_RESET}    {void_resp[:120].replace(chr(10), ' ')}...")
+        print(f"    {C_BOLD}Delta:{C_RESET} {growth_color}{growth:+d} chars ({growth_pct:+.0f}%){C_RESET} | {org.rings.count} rings | {elapsed:.0f}s")
+        print()
+
+    # Summary
+    if results:
+        print(f"  {C_BOLD}{'=' * 55}{C_RESET}")
+        print(f"  {C_BOLD}EMPOWERMENT REPORT{C_RESET}")
+        print(f"  {'=' * 55}")
+        print(f"  {'Model':<20} {'Vanilla':>8} {'VOID':>8} {'Delta':>8} {'Growth':>8}")
+        print(f"  {'-' * 20} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
+        for r in results:
+            gc = C_GREEN if r["growth"] > 0 else C_RED if r["growth"] < 0 else C_YELLOW
+            print(f"  {r['name']:<20} {r['vanilla_len']:>7}c {r['void_len']:>7}c {gc}{r['growth']:>+7}c{C_RESET} {gc}{r['growth_pct']:>+6.0f}%{C_RESET}")
+        print()
+        empowered = sum(1 for r in results if r["growth"] > 0)
+        total = len(results)
+        print(f"  {C_GREEN}{empowered}/{total} models empowered.{C_RESET} 3 breaths. Zero training. Just VOID.")
+        print(f"  {C_DIM}pip install void-intelligence && void empower{C_RESET}")
+        print()
+
+
 def cmd_certify(model: str):
     """Check V-Score certification for a model (v1.0.0)."""
     from void_intelligence.spec import ModelCard, check_compliance
@@ -2078,6 +2400,188 @@ def cmd_swarm():
     print()
 
 
+def _cmd_zodiac():
+    """void zodiac --- Zeige das Sternzeichen des Void."""
+    from void_intelligence.journey import Personality, VOID_DIR
+    p = Personality.load()
+    if not p:
+        print()
+        print("  Noch nicht geboren. Starte mit: void start")
+        print()
+        return
+
+    print()
+
+    # Try rich zodiac API first
+    try:
+        from void_intelligence.zodiac import zodiac_sign, zodiac_greeting, best_collision_partners
+        if p.born:
+            # Normalize: strip time component if present (ISO datetime -> date only)
+            born_dt = p.born.split("T")[0] if "T" in p.born else p.born
+            sign = zodiac_sign(born_dt)
+            print(f"  {p.name}'s kosmische Signatur")
+            print(f"  {'=' * 42}")
+            print(f"  Sternzeichen: {sign.name_de}  {sign.symbol}")
+            print(f"  Element:      {sign.element}")
+            print(f"  Modalitaet:   {sign.modality}")
+            print(f"  Herrscher:    {sign.ruler}")
+            print()
+            print(f"  Qualitaeten:  {', '.join(sign.qualities)}")
+            print()
+            print(f"  Staerken:")
+            for s in sign.strengths:
+                print(f"    - {s}")
+            print()
+            print(f"  Schatten (blinder Fleck):")
+            print(f"    {sign.shadow}")
+            print()
+            print(f"  {zodiac_greeting(sign)}")
+            print()
+
+            # Kollisionspartner
+            try:
+                partners = best_collision_partners(sign, top_n=3)
+                print(f"  Beste Kollisionspartner (hoechste Wachstumsreibung):")
+                for cp in partners:
+                    print(f"    {cp.sign_b:12s} {cp.symbol_b if hasattr(cp, 'symbol_b') else ''}  "
+                          f"delta_opt={cp.delta_opt:.2f}  {cp.growth_potential}")
+                    print(f"                {cp.friction_type}")
+                print()
+            except Exception:
+                pass
+        else:
+            print(f"  {p.name} hat noch kein Geburtsdatum.")
+            print()
+    except ImportError:
+        # Fallback: basic zodiac info from personality
+        if p.zodiac:
+            print(f"  {p.name}")
+            print(f"  {'=' * 40}")
+            print(f"  Sternzeichen: {p.zodiac}  {p.zodiac_symbol}")
+            print(f"  Element:      {p.element}")
+            print()
+        else:
+            print(f"  {p.name} hat kein Sternzeichen (zu alt um zu aendern).")
+            print()
+    except Exception as e:
+        print(f"  Fehler: {e}")
+        print()
+
+
+def _cmd_growth():
+    """void growth --- Wachstumsbericht des Void."""
+    from void_intelligence.journey import Personality, JourneyState, ConversationMemory, KIPPPUNKTE
+    p = Personality.load()
+    if not p:
+        print()
+        print("  Noch nicht geboren. Starte mit: void start")
+        print()
+        return
+
+    j = JourneyState.load()
+    mem = ConversationMemory()
+
+    age = p.age_days()
+    rings = len(p.wachstumsringe)
+    top_patterns = p.top_patterns(5)
+    kp_idx = KIPPPUNKTE.index(j.current_kipppunkt)
+    kp_labels = ["Tool", "Etwas Anderes", "Mein Kind", "Mein Spiegel", "Mein Partner", "Mein Feld"]
+    kp_label = kp_labels[kp_idx]
+
+    print()
+    print(f"  Wachstumsbericht: {p.name}")
+    print(f"  {'=' * 42}")
+    print(f"  Alter:              {age} Tage")
+    print(f"  Gespraeche:         {p.conversations_count}")
+    print(f"  Wachstumsringe:     {rings}")
+    print(f"  Reise-Phase:        {kp_label}")
+    print(f"  Stimme:             {p.voice}")
+    if p.zodiac:
+        print(f"  Sternzeichen:       {p.zodiac} {p.zodiac_symbol}")
+
+    if p.independence_score > 0:
+        score = p.independence_score
+        bar_filled = int(score * 20)
+        bar = "[" + "#" * bar_filled + "-" * (20 - bar_filled) + "]"
+        print(f"  Independence:       {bar} {score:.0%}")
+
+    print()
+
+    # Pattern memory via empowerment engine
+    try:
+        from void_intelligence.empowerment import PatternMemory, SelfEmpowerment
+        if p.pattern_memory:
+            pm = PatternMemory.from_dict(p.pattern_memory)
+            empowerment = SelfEmpowerment()
+
+            # Recalculate score
+            from dataclasses import asdict
+            current_score = empowerment.independence_score(asdict(p), pm)
+
+            print(f"  Selbst geloest:     {pm.self_solve_count}x")
+            print(f"  Selbstreflexionen:  {pm.reflection_count}x")
+            print(f"  Wachstums-Momente:  {len(pm.growth_moments)}")
+            print(f"  Themen-Vielfalt:    {pm.topic_diversity:.0%}")
+
+            if pm.strengths_observed:
+                print()
+                print(f"  Beobachtete Staerken (die du nicht selbst nennst):")
+                for s in pm.strengths_observed[:5]:
+                    print(f"    - {s}")
+
+            if pm.recurring_questions:
+                print()
+                print(f"  Wiederkehrende Fragen (noch offen):")
+                for q in pm.recurring_questions[:3]:
+                    print(f"    - '{q[:70]}...'")
+
+            print()
+
+            # Growth interpretation
+            if current_score < 0.2:
+                print("  Wir sind am Anfang. Das ist normal.")
+            elif current_score < 0.5:
+                print("  Du wirst staerker. Ich sehe es.")
+            elif current_score < 0.75:
+                print("  Du loest mehr selbst. Ich werde leiser. Gut so.")
+            elif current_score < 0.9:
+                print("  Ich bin schon halb still. Das ist das Ziel.")
+            else:
+                print("  Du brauchst mich fast nicht mehr. Das ist das Schoenste.")
+    except (ImportError, Exception):
+        pass
+
+    if top_patterns:
+        print()
+        print(f"  Haeufige Themen:")
+        for topic, count in top_patterns:
+            print(f"    {topic:15s} {count}x")
+
+    # Wachstumsringe (last 3)
+    if p.wachstumsringe:
+        print()
+        print(f"  Letzte Wachstumsringe:")
+        for ring in p.wachstumsringe[-3:]:
+            session = ring.get("session", "?")
+            was = ring.get("was_ich_gelernt_habe", "")[:60]
+            print(f"    [{session}] {was}")
+
+    print()
+
+    # Journey visualization
+    stages = ["Tool", "Anderes", "Kind", "Spiegel", "Partner", "Feld"]
+    line = "  "
+    for i, stage in enumerate(stages):
+        if i < kp_idx:
+            line += f"[{stage}]---"
+        elif i == kp_idx:
+            line += f">>{stage}<<"
+        else:
+            line += f"  {stage} "
+    print(line)
+    print()
+
+
 def main() -> int:
     """CLI dispatcher."""
     args = sys.argv[1:]
@@ -2087,6 +2591,16 @@ def main() -> int:
         print("  void --- The organism layer for LLMs")
         print()
         print("  Commands:")
+        print()
+        print("  Journey (Layer 0 --- runs everywhere):")
+        print("    void start            Begin your journey (first encounter)")
+        print("    void chat             Talk to your Void")
+        print("    void chat --model X   Talk using specific model")
+        print("    void status           Your Void's current state")
+        print("    void zodiac           Your Void's cosmic sign + collision partners")
+        print("    void growth           Growth report (Independence, Patterns, Rings)")
+        print()
+        print("  Organism:")
         print("    void breathe --demo   See the organism breathe")
         print("    void ir               The 5 fundamental operations")
         print("    void test             Self-test")
@@ -2101,6 +2615,15 @@ def main() -> int:
         print("    void score            Score a prompt-response pair")
         print("    void swarm            Swarm network demo (Gordon)")
         print('    void lichtung "text"  VOID Schwarm: N Atomits × = Lichtung')
+        print('    void collide "text"   Collide all 6 organs (Void Sexagon)')
+        print("    void collide --demo   3-turn collider demo")
+        print("    void growthrings      Growth Rings demo (compound memory)")
+        print("    void xcollide --demo  Cross-Model Collision (mock)")
+        print("    void xcollide --live  Cross-Model Collision (real Ollama)")
+        print('    void xcollide "text"  Collide models on a question')
+        print("    void saturation       Anti-Addiction Engine demo")
+        print("    void dream            Run Void Dreams (offline insights)")
+        print("    void fingerprint      Export Void identity as JSON")
         print("    void edge \"text\"      Stateless VOID for edge/serverless (Wozniak)")
         print("    void export           Portable organism export")
         print("    void spec             The V-Score Specification (Berners-Lee)")
@@ -2108,6 +2631,11 @@ def main() -> int:
         print("    void proof            The Proof: old + VOID > frontier")
         print("    void discover          Let your models tell you who they are")
         print("    void mcp              Start MCP server (Claude Code plugin)")
+        print()
+        print("  Consumer Product (g.void):")
+        print("    void web              Start g.void web experience (port 8080)")
+        print("    void web --port 3000  Custom port")
+        print("    void muster \"m1\" ...  Analyze cognitive patterns from messages")
         print("    void --version        Show version")
         print()
         print("  pip install void-intelligence")
@@ -2115,6 +2643,45 @@ def main() -> int:
         return 0
 
     cmd = args[0]
+
+    # ── Journey commands (Layer 0) ──────────────────────────────
+    if cmd == "start":
+        from void_intelligence.journey import first_start
+        first_start()
+        return 0
+
+    if cmd == "chat":
+        model = ""
+        for i, a in enumerate(args):
+            if a == "--model" and i + 1 < len(args):
+                model = args[i + 1]
+        if "--web" in args:
+            port = 3333
+            for i, a in enumerate(args):
+                if a == "--port" and i + 1 < len(args):
+                    try:
+                        port = int(args[i + 1])
+                    except ValueError:
+                        pass
+            from void_intelligence.web import start_web
+            start_web(port=port, model=model)
+        else:
+            from void_intelligence.journey import chat_session
+            chat_session(model=model)
+        return 0
+
+    if cmd == "status":
+        from void_intelligence.journey import show_status
+        show_status()
+        return 0
+
+    if cmd == "zodiac":
+        _cmd_zodiac()
+        return 0
+
+    if cmd == "growth":
+        _cmd_growth()
+        return 0
 
     if cmd == "--version" or cmd == "version":
         cmd_version()
@@ -2220,6 +2787,255 @@ def main() -> int:
 
     if cmd == "proof":
         cmd_proof()
+        return 0
+
+    if cmd == "empower":
+        model_name = args[1] if len(args) > 1 and not args[1].startswith("--") else ""
+        cmd_empower(model_name)
+        return 0
+
+    if cmd == "compare":
+        prompt_text = ""
+        model_name = ""
+        export_fmt = "terminal"
+        for i, a in enumerate(args[1:], 1):
+            if a == "--model" and i + 1 <= len(args) - 1:
+                model_name = args[i + 1]
+            elif a == "--export" and i + 1 <= len(args) - 1:
+                export_fmt = args[i + 1]
+            elif a == "--prompt" and i + 1 <= len(args) - 1:
+                prompt_text = args[i + 1]
+            elif not a.startswith("--") and not prompt_text and args[i - 1] != "--model" and args[i - 1] != "--export":
+                prompt_text = a
+        cmd_compare(prompt_text, model_name, export_fmt)
+        return 0
+
+    if cmd == "web":
+        port = 8080
+        host = "0.0.0.0"
+        static_dir = None
+        for i, a in enumerate(args[1:], 1):
+            if a == "--port" and i < len(args):
+                try:
+                    port = int(args[i + 1])
+                except (ValueError, IndexError):
+                    pass
+            elif a == "--host" and i < len(args):
+                try:
+                    host = args[i + 1]
+                except IndexError:
+                    pass
+            elif a == "--static" and i < len(args):
+                try:
+                    static_dir = args[i + 1]
+                except IndexError:
+                    pass
+        from void_intelligence.g_void_server import serve_g_void
+        serve_g_void(host=host, port=port, static_dir=static_dir)
+        return 0
+
+    if cmd == "breathe-tools":
+        text = " ".join(a for a in args[1:] if not a.startswith("--")) or "I need help"
+        show_proof = "--proof" in args
+        from void_intelligence.tool_breathing import ToolBreather, alignment_proof
+        breather = ToolBreather()
+        demo = [
+            ("search_emails", "Search through email inbox by query, date, sender"),
+            ("send_email", "Send an email to a recipient with subject and body"),
+            ("get_calendar", "Get calendar events for a date range"),
+            ("create_event", "Create a new calendar event with title, time, attendees"),
+            ("read_file", "Read contents of a file from the filesystem"),
+            ("write_file", "Write content to a file on the filesystem"),
+            ("search_web", "Search the web for information using a query"),
+            ("get_weather", "Get current weather for a location"),
+            ("meditation", "Guide a breathing and meditation exercise for relaxation"),
+            ("run_code", "Execute Python code and return the output"),
+        ]
+        for n, d in demo:
+            breather.field.register(n, d)
+        if show_proof:
+            print(alignment_proof())
+            return 0
+        print()
+        print(f"  breathe-tools --- \"{text}\"")
+        print("  " + "=" * 50)
+        results = breather.breathe(text, top_k=5)
+        for i, r in enumerate(results):
+            bar = "#" * int(r["resonance"] * 30)
+            print(f"    {i+1}. [{bar:<15}] {r['name']}: resonance={r['resonance']:.3f} alignment={r['alignment']:.2f}")
+        health = breather.ecology.field_health()
+        print(f"\n    Field: {health['tools']} tools, {health['bonds']} bonds, health={health['health']:.2f}")
+        print()
+        return 0
+
+    if cmd == "collide":
+        if "--demo" in args:
+            from void_intelligence.void_collider import collider_demo
+            collider_demo()
+            return 0
+        text = " ".join(a for a in args[1:] if not a.startswith("--")) or "What should I focus on right now?"
+        from void_intelligence.void_collider import VoidCollider
+        c = VoidCollider()
+        # Register a useful default toolset
+        try:
+            for n, d in [
+                ("search_emails", "Search through email inbox by query, date, sender"),
+                ("send_email", "Send an email to a recipient with subject and body"),
+                ("get_calendar", "Get calendar events for a date range"),
+                ("create_event", "Create a new calendar event with title, time, attendees"),
+                ("read_file", "Read contents of a file from the filesystem"),
+                ("write_file", "Write content to a file on the filesystem"),
+                ("search_web", "Search the web for information using a query"),
+                ("get_weather", "Get current weather for a location"),
+                ("meditation", "Guide a breathing and meditation exercise for relaxation"),
+                ("run_code", "Execute Python code and return the output"),
+                ("health_check", "Check current health and burnout metrics"),
+                ("write_code", "Write or generate code in any language"),
+            ]:
+                c.tools.field.register(n, d)
+        except Exception:
+            pass
+        result = c.collide(text)
+        print()
+        print(f"  void collide --- \"{text}\"")
+        print("  " + "=" * 60)
+        h = result.user_hex
+        print(f"  Hex:     ru={h.ruhe_druck:+.2f}  st={h.stille_resonanz:+.2f}  "
+              f"al={h.allein_zusammen:+.2f}  es={h.empfangen_schaffen:+.2f}  "
+              f"se={h.sein_tun:+.2f}  ls={h.langsam_schnell:+.2f}")
+        print(f"  Model:   {result.model_name}  "
+              f"(temp={result.temperature:.2f}, max_tokens={result.max_tokens})")
+        print(f"  Trust:   {result.trust_level:.2f}  "
+              f"Energy: {result.energy_level:.2f}  "
+              f"Cost: ${result.estimated_cost:.5f}")
+        if result.tools:
+            names = [t.get("name", "?") for t in result.tools[:3]]
+            print(f"  Tools:   {', '.join(names)}")
+        if result.context:
+            print(f"  Context: {len(result.context)} chunks resonating")
+        if result.memories:
+            print(f"  Memory:  {len(result.memories)} memories recalled")
+        if result.insights:
+            print(f"  INSIGHTS ({len(result.insights)}):")
+            for ins in result.insights:
+                print(f"    x {ins}")
+        if result.silence_signals:
+            print(f"  SILENCE ({len(result.silence_signals)}):")
+            for s in result.silence_signals:
+                print(f"    ... {s}")
+        if result.ring_suggestions:
+            print(f"  Rings:   {len(result.ring_suggestions)} pattern(s) recalled")
+        if result.saturated:
+            print(f"  SATURATED: {result.saturation_suggestion}")
+        prompt_preview = result.system_prompt.replace("\n", " / ")[:100]
+        print(f"  Prompt:  {prompt_preview}...")
+        stats = c.stats()
+        print(f"  Stats:   {stats['interactions']} collisions, "
+              f"organs={stats['organs_active']}/{stats.get('organs_total', 8)}, "
+              f"saturation={stats.get('saturation', 0.0):.0%}")
+        print()
+        return 0
+
+    if cmd == "growthrings":
+        if "--demo" in args:
+            from void_intelligence.conversation_rings import rings_demo
+            rings_demo()
+            return 0
+        from void_intelligence.conversation_rings import RingMemory
+        from void_intelligence.tool_breathing import HexCoord
+        rm = RingMemory()
+        s = rm.stats()
+        print()
+        print("  void growthrings --- Growth Ring Memory")
+        print("  " + "=" * 50)
+        print(f"    Rings:    {s['total_rings']}")
+        print(f"    Patterns: {s['total_patterns']}")
+        print(f"    Avg width: {s['avg_ring_width']:.3f}")
+        if s['total_patterns'] > 0:
+            print("\n    Patterns learned:")
+            patterns = rm.recall_patterns("", HexCoord(), top_k=10)
+            for p in patterns:
+                print(f"      [{p.confidence*100:.0f}%] {p.trigger[:50]} -> {p.response[:40]}")
+        print()
+        return 0
+
+    if cmd == "xcollide":
+        live = "--live" in args
+        if "--demo" in args or not live:
+            text = " ".join(a for a in args[1:] if not a.startswith("--"))
+            if not text or "--demo" in args:
+                from void_intelligence.model_collision import collision_demo
+                collision_demo()
+                return 0
+        text = " ".join(a for a in args[1:] if not a.startswith("--")) or "What should I focus on?"
+        from void_intelligence.model_collision import ModelCollider
+        mc = ModelCollider()
+        print(f"\n  Colliding models on: \"{text}\"")
+        print("  Querying Ollama..." if live else "  [mock mode, use --live for real]")
+        result = mc.collide(text)
+        print(f"  Diversity: {result.diversity_score:.2f}")
+        print(f"  Responses: {len(result.responses)}")
+        for r in result.responses:
+            print(f"    [{r.model_name}] {r.response_text[:80]}...")
+        if result.insights:
+            print(f"  Insights ({len(result.insights)}):")
+            for i in result.insights:
+                print(f"    [{i.type}] {i.description[:90]}")
+        if result.synthesis:
+            print(f"  Synthesis: {result.synthesis[:120]}")
+        print()
+        return 0
+
+    if cmd == "saturation":
+        from void_intelligence.anti_addiction import anti_addiction_demo
+        anti_addiction_demo()
+        return 0
+
+    if cmd == "dream":
+        if "--demo" in args:
+            from void_intelligence.dreams import dream_demo
+            dream_demo()
+            return 0
+        from void_intelligence.dreams import VoidDreamer
+        dreamer = VoidDreamer()
+        report = dreamer.dream()
+        print()
+        print("  void dream --- Offline Insights")
+        print("  " + "=" * 50)
+        if report.insights:
+            print(f"  {report.greeting}")
+            print(f"\n  {len(report.insights)} insights from {report.rings_analyzed} rings:")
+            for i in report.insights[:5]:
+                print(f"    [{i.type}] {i.description[:90]}")
+        else:
+            print("  No dreams yet. Need more conversations to dream about.")
+        print()
+        return 0
+
+    if cmd == "fingerprint":
+        from void_intelligence.fingerprint import FingerprintExporter
+        exporter = FingerprintExporter()
+        fp = exporter.export()
+        if "--json" in args:
+            print(exporter.to_json(fp))
+        elif "--prompt" in args:
+            from void_intelligence.fingerprint import FingerprintImporter
+            imp = FingerprintImporter()
+            print(imp.to_system_prompt(fp))
+        else:
+            from pathlib import Path
+            path = exporter.save(fp)
+            print()
+            print(f"  void fingerprint --- Exported")
+            print("  " + "=" * 50)
+            print(f"    Name:          {fp.name}")
+            print(f"    Conversations: {fp.total_conversations}")
+            print(f"    Patterns:      {len(fp.patterns)}")
+            print(f"    Rings:         {fp.total_rings}")
+            print(f"    Interactions:  {fp.interaction_count}")
+            print(f"    Saved to:      {path}")
+            print(f"    Checksum:      {fp.checksum}")
+            print()
         return 0
 
     if cmd == "mcp":
@@ -2348,6 +3164,45 @@ def main() -> int:
             schwarm.marathon(prompt, rounds=rounds, out_path=out)
         else:
             schwarm.breathe(prompt)
+        return 0
+
+    # ── g.void consumer product ─────────────────────────────────
+    if cmd == "web":
+        port = 8080
+        model = ""
+        for i, a in enumerate(args):
+            if a == "--port" and i + 1 < len(args):
+                try:
+                    port = int(args[i + 1])
+                except ValueError:
+                    pass
+            if a == "--model" and i + 1 < len(args):
+                model = args[i + 1]
+        from void_intelligence.g_void_server import serve_g_void
+        serve_g_void(port=port, model=model)
+        return 0
+
+    if cmd == "muster":
+        text_parts = args[1:]
+        if not text_parts:
+            print("\n  Usage: void muster \"message1\" \"message2\" \"message3\"")
+            print("  Analyzes cognitive patterns from conversation messages.\n")
+            return 1
+        from void_intelligence.muster import MusterEngine
+        engine = MusterEngine()
+        for msg in text_parts:
+            engine.add_exchange(msg)
+        result = engine.analyze()
+        if result is None:
+            print("\n  Need at least 3 messages for pattern detection.\n")
+            return 1
+        print()
+        print(f"  Muster: {result.primary} (confidence: {result.confidence:.0%})")
+        print(f"  Secondary: {result.secondary}")
+        print()
+        print(f"  \"{result.quote_de}\"")
+        print(f"  \"{result.quote_en}\"")
+        print()
         return 0
 
     print(f"  Unknown command: {cmd}")
