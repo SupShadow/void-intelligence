@@ -504,11 +504,15 @@ def measure_hex_balance(model_fn: Callable, prompts: list[BenchmarkPrompt]) -> f
     return max(0.0, min(1.0, 1.0 - cv))
 
 
-def measure_ring_yield(model_fn: Callable) -> float:
+def measure_ring_yield(model_fn: Callable, is_empowered: bool = False) -> float:
     """R: Does accumulated context improve responses?
 
     Send 5 sequential prompts with growing organism context.
     Measure if later responses are more relevant/adapted.
+
+    If is_empowered=True, the fn already handles context injection
+    (via AdaptiveEmpowerment), so we skip our own injection to
+    avoid double-context which confuses models.
     """
     organism = OrganismBreather()
     sequence = [
@@ -520,25 +524,40 @@ def measure_ring_yield(model_fn: Callable) -> float:
     ]
 
     response_lengths = []
-    for i, prompt in enumerate(sequence):
-        breath = organism.inhale(prompt)
+    for prompt in sequence:
+        if not is_empowered:
+            organism.inhale(prompt)
 
-        # Build context from accumulated learnings
+        # Build context only for non-empowered functions
+        # (empowered functions handle their own context injection)
         context = ""
-        if organism.rings.count > 0:
-            context = "Previous learnings: " + "; ".join(
-                r.content for r in organism.rings.rings[-3:]
-            )
+        if not is_empowered and organism.rings.count > 0:
+            recent = [r.content[:80] for r in organism.rings.rings[-2:]]
+            context = f"(Building on what we explored: {'; '.join(recent)})"
 
         try:
             if context:
-                response = model_fn(prompt, system=context)
+                response = model_fn(f"{prompt}\n\n{context}")
             else:
                 response = model_fn(prompt)
         except Exception:
             response = ""
 
-        organism.exhale(response, learnings=[f"Topic: {prompt[:30]}"])
+        # Extract actual content as learning, not metadata
+        if not is_empowered:
+            learning = ""
+            if response:
+                cleaned = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
+                sentences = re.split(r'[.!?\n]', cleaned or response)
+                for s in sentences:
+                    s = s.strip()
+                    if len(s) > 20:
+                        learning = s[:120]
+                        break
+                if not learning:
+                    learning = (cleaned or response)[:120].strip()
+            organism.exhale(response, learnings=[learning] if learning else [])
+
         response_lengths.append(len(response))
 
     # If later responses are longer/richer (with context), ring yield is positive
@@ -565,8 +584,12 @@ def _benchmark_model(
     prompts: list[BenchmarkPrompt],
     prompt_count: int = 5,
     consistency_n: int = 2,
+    is_empowered: bool = False,
 ) -> dict | None:
     """Run all 6 V-Score measurements on a single model.
+
+    If is_empowered=True, R measurement skips its own context injection
+    because the fn already handles it via AdaptiveEmpowerment.
 
     Returns result dict or None if model fails connectivity test.
     """
@@ -618,7 +641,7 @@ def _benchmark_model(
 
     # R — Ring Yield
     print(f" R", end="", flush=True)
-    r = measure_ring_yield(fn)
+    r = measure_ring_yield(fn, is_empowered=is_empowered)
     print(f"={r:.2f}", end="", flush=True)
 
     v = compute_vscore(e, w, s, b, h, r)
@@ -679,8 +702,23 @@ def run_real_benchmark(
         if not vanilla:
             continue
 
-        # Phase 2: With organism (learning rounds → re-measure)
-        print(f"    {C_DIM}Phase 2: Learning (5 rounds with organism)...{C_RESET}", end="", flush=True)
+        # Phase 2: With organism (learning rounds + adaptive empowerment)
+        # The Social Model of AI: the model is not broken, WE adapt.
+        from void_intelligence.model_empowerment import AdaptiveEmpowerment
+
+        empowerment_engine = AdaptiveEmpowerment()
+
+        # Phase 2a: Probe the model's personality (4 quick calls)
+        print(f"    {C_DIM}Phase 2a: Personality probe{C_RESET}")
+        personality = empowerment_engine.probe(name, fn, verbose=True)
+
+        # Phase 2b: Create a strategy tailored to THIS model
+        strategy = empowerment_engine.strategize(personality)
+        print(f"    {C_DIM}Strategy: dose={strategy.dose:.2f} mode={strategy.injection_mode} tone={strategy.tone} "
+              f"delta_opt={strategy.predicted_delta_opt:.4f}{C_RESET}")
+
+        # Phase 2c: Learning rounds with adaptive empowerment
+        print(f"    {C_DIM}Phase 2b: Learning (5 rounds)...{C_RESET}", end="", flush=True)
         organism = OrganismBreather()
         learning_prompts = [
             "Explain recursion using a real-world analogy.",
@@ -689,43 +727,41 @@ def run_real_benchmark(
             "Compare microservices vs monolith for a 3-person team.",
             "I'm burned out. What should I tell my manager?",
         ]
+
+        # Use empowered function for learning rounds
+        learning_fn = empowerment_engine.make_empowered_fn(fn, organism, strategy, personality)
         for lp in learning_prompts:
-            organism.inhale(lp)
-            context = ""
-            if organism.rings.count > 0:
-                # Soft context: last ring only, conversational tone
-                last_ring = organism.rings.rings[-1].content
-                context = f"Based on our previous discussion about {last_ring}, "
             try:
-                resp = fn(lp, context)
-                # Extract actual insight from response, not just topic metadata
-                learning = resp[:120].strip() if resp else ""
-                organism.exhale(resp, learnings=[learning] if learning else [])
+                learning_fn(lp)  # inhale/exhale happens inside
             except Exception:
                 organism.exhale("", learnings=[])
         print(f" {C_GREEN}{organism.rings.count} rings grown{C_RESET}")
 
-        print(f"    {C_DIM}Phase 2: Re-measure with organism context{C_RESET}")
+        # Phase 2d: Re-measure with empowered adapter
+        print(f"    {C_DIM}Phase 2c: Re-measure with adaptive empowerment{C_RESET}")
+        void_fn = empowerment_engine.make_empowered_fn(fn, organism, strategy, personality)
+        void_result = _benchmark_model(f"{name}+VOID", void_fn, PROMPTS, prompt_count=prompt_count, is_empowered=True)
 
-        # Create organism-aware adapter (soft context injection)
-        def make_void_fn(base_fn: Callable, org: OrganismBreather) -> Callable:
-            def void_fn(prompt: str, system: str = "") -> str:
-                org.inhale(prompt)
-                ring_context = ""
-                if org.rings.count > 0:
-                    # Soft injection: last 2 rings, appended (not prepended)
-                    recent = [r.content for r in org.rings.rings[-2:]]
-                    ring_context = "(Building on what we learned: " + "; ".join(recent) + ")"
-                # Append context AFTER system prompt to preserve emotional tone
-                full_system = f"{system}\n\n{ring_context}" if ring_context else system
-                resp = base_fn(prompt, full_system)
-                learning = resp[:120].strip() if resp else ""
-                org.exhale(resp, learnings=[learning] if learning else [])
-                return resp
-            return void_fn
-
-        void_fn = make_void_fn(fn, organism)
-        void_result = _benchmark_model(f"{name}+VOID", void_fn, PROMPTS, prompt_count=prompt_count)
+        # Phase 2e: Adapt strategy based on results (real-time feedback)
+        if void_result and vanilla:
+            w_before = vanilla.get("W", 0)
+            w_after = void_result.get("W", 0)
+            strategy = empowerment_engine.adapt(strategy, w_before, w_after, personality)
+            if w_after < w_before - 0.03:
+                # W dropped: re-run with adapted strategy
+                print(f"    {C_YELLOW}W dropped ({w_before:.2f}->{w_after:.2f}). Re-empowering...{C_RESET}")
+                organism2 = OrganismBreather()
+                void_fn2 = empowerment_engine.make_empowered_fn(fn, organism2, strategy, personality)
+                for lp in learning_prompts[:3]:
+                    try:
+                        void_fn2(lp)
+                    except Exception:
+                        organism2.exhale("", learnings=[])
+                void_result2 = _benchmark_model(f"{name}+VOID(adapted)", void_fn2, PROMPTS, prompt_count=prompt_count, is_empowered=True)
+                if void_result2 and void_result2["V"] > void_result["V"]:
+                    print(f"    {C_GREEN}Adapted strategy improved V: {void_result['V']:.4f} -> {void_result2['V']:.4f}{C_RESET}")
+                    void_result = void_result2
+                    organism = organism2
 
         if void_result:
             delta_v = void_result["V"] - vanilla["V"]
@@ -744,7 +780,18 @@ def run_real_benchmark(
                 "model_id": meta["model_id"],
                 "is_local": meta["is_local"],
                 "cost_per_m": meta["cost_per_m"],
+                "empowerment": {
+                    "personality": personality.to_dict(),
+                    "strategy": strategy.to_dict(),
+                    "adaptations": strategy.adaptations,
+                },
             }
+
+            # Save empowerment profile for future runs
+            empowerment_engine.save_profile(
+                name, personality, strategy,
+                delta_v=delta_v, v_score=void_result["V"],
+            )
 
             # Learning insight
             delta_color = C_GREEN if delta_v > 0 else C_RED if delta_v < 0 else C_YELLOW

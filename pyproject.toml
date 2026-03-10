@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "void-intelligence"
-version = "3.0.0"
-description = "The industry builds models that think. We build models that breathe. 40 modules. Void Sexagon (6 breathing organs + collider). Growth Rings. Cross-Model Collision. Anti-Addiction. Zero dependencies."
+version = "4.0.0"
+description = "Models that breathe, not just think. 123 modules. Zero dependencies. SELEN (universal feature detection). Dekagon (10-lens perception). Enigma (auth by depth). Sacred Tokens. Flinch Detection. Thought Volume. Soul persistence. 13 measurement categories nobody else has. pip install void-intelligence."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
     { name = "Julian Guggeis", email = "julian@guggeis.de" },
 ]
-keywords = ["ai", "llm", "v-score", "model-routing", "adaptive-ai", "compound-intelligence", "void", "intelligence", "organism", "swarm", "immune-system", "specification"]
+keywords = ["ai", "llm", "breathing-ai", "model-routing", "adaptive-ai", "compound-intelligence", "void", "intelligence", "organism", "growth-rings", "anti-addiction", "flinch-detection", "self-research"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",

@@ -588,16 +588,33 @@ def make_codex(
 
     def call(prompt: str, system: str = "") -> str:
         full_prompt = f"{system}\n\n{prompt}" if system else prompt
-        cmd = [codex_path, "exec", "--model", model, full_prompt]
+        import tempfile
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
+            tmp_path = tmp.name
+        cmd = [codex_path, "exec", "--model", model, "-o", tmp_path, full_prompt]
         try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout,
             )
-            out = result.stdout.strip()
+            # -o writes only the last message (clean output)
+            try:
+                with open(tmp_path) as f:
+                    out = f.read().strip()
+            except FileNotFoundError:
+                out = result.stdout.strip()
+            finally:
+                try:
+                    _os.unlink(tmp_path)
+                except OSError:
+                    pass
             # Strip think tags if present (reasoning models)
             out = _THINK_RE.sub("", out).strip()
             return out
         except subprocess.TimeoutExpired:
+            try:
+                _os.unlink(tmp_path)
+            except OSError:
+                pass
             raise TimeoutError(f"Codex ({model}): timeout after {timeout}s")
 
     call.__name__ = f"codex:{model}"  # type: ignore[attr-defined]
@@ -787,6 +804,9 @@ MODEL_REGISTRY: dict[str, dict] = {
     "deepseek-r1-14b":  {"provider": "ollama", "model_id": "deepseek-r1:14b",     "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
     "deepseek-r1-8b":   {"provider": "ollama", "model_id": "deepseek-r1:8b",      "is_local": True,  "cost_per_m": 0.0,   "is_thinker": True},
     "glm4-9b":          {"provider": "ollama", "model_id": "glm4:latest",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "qwen2.5-14b":      {"provider": "ollama", "model_id": "qwen2.5:14b",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "qwen2.5-coder-14b":{"provider": "ollama", "model_id": "qwen2.5-coder:14b",   "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
+    "llava-7b":         {"provider": "ollama", "model_id": "llava:7b",             "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
     "llama3.3-70b":     {"provider": "ollama", "model_id": "llama3.3:70b",         "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
     "llama3.2-3b":      {"provider": "ollama", "model_id": "llama3.2:3b",          "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
     "gemma3-9b":        {"provider": "ollama", "model_id": "gemma3:latest",        "is_local": True,  "cost_per_m": 0.0,   "is_thinker": False},
